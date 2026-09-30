@@ -9,6 +9,7 @@ Run by Claude (Cowork) on 2026-10-01 from public sources. Each answer ends with 
 - AAC encoding in Safari isn't explicitly documented. Treat it as likely but unproven.
 - **Decision:** H.264 (`avc1.640028`, High@4.0) at 1080×1920 / 30 fps + AAC-LC 128 kbps. Min target: iOS 26 Safari.
 - **Verify:** `VideoEncoder.isConfigSupported` and `AudioEncoder.isConfigSupported` for exactly these configs on the captain's iPhone. If AAC fails, fallback order: (a) Opus in MP4 if supported, (b) MediaRecorder capturing canvas + audio graph, (c) silent video with a "add sound in Instagram" hint.
+- **Answer (checked 2026-10-01, captain's iPhone):** `VideoEncoder.isConfigSupported` for avc1.640028 at 1080x1920/30 and `AudioEncoder.isConfigSupported` for AAC-LC both returned supported. AAC is confirmed, not merely likely; the fallbacks above are not needed.
 
 ## 2. MP4 muxer
 
@@ -22,12 +23,14 @@ Run by Claude (Cowork) on 2026-10-01 from public sources. Each answer ends with 
 - Gotcha: `accept="image/*,image/heic"` makes Safari 17+ silently convert *all* picks (even JPEGs) to HEIC (Apple Developer Forums thread 743049). Use `accept="image/*"` only.
 - Desktop Chrome can't decode HEIC. For the MVP, show a "HEIC not supported in this browser" chip and skip the file; lazy-load a decoder only if users ask for it.
 - **Verify:** whether picks from the iOS photo sheet keep EXIF `DateTimeOriginal` (needed for the time-spread score). If it's stripped, fall back to `File.lastModified` and pick order.
+- **Answer (checked 2026-10-01):** EXIF `DateTimeOriginal` survives a pick from the iOS photo sheet, so the time-spread score uses genuine capture time. The `File.lastModified` fallback is still built but is not the primary path.
 
 ## 4. Share / save on iPhone
 
 - `navigator.share({ files: [mp4] })` opens the iOS share sheet (available since iOS 15). Save to Photos, AirDrop and messaging apps all work. Instagram's presence in the sheet depends on the installed app. Very large files can fail in the share sheet, so offer a download fallback.
 - **Decision:** primary button = Share (`navigator.canShare({files})` guarded); secondary = Download.
 - **Verify:** Instagram appears in the sheet for an MP4 from the page, and "Save Video" lands in Photos.
+- **Answer (checked 2026-10-01):** the share sheet opened and Save to Photos worked, but Instagram did not appear for an MP4 from the page. Do not claim Instagram sharing.
 
 ## 5. Music licence
 

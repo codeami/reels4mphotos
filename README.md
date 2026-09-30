@@ -23,7 +23,7 @@ Someone with a camera roll full of trip / event photos who wants a reel to post 
 2. **Auto-select** — the app picks the best ~10 on-device: drops blurry, badly exposed and near-duplicate shots, keeps a spread across time. The user can toggle any photo in or out and drag to reorder.
 3. **Pick a beat** — one of 3 bundled royalty-free tracks, each with a pre-computed beat map.
 4. **Preview** — 1080×1920, 30 fps: Ken Burns pan/zoom on each photo, cuts land on beats, 2 transition styles. Target 15–30 s.
-5. **Export & share** — MP4 (H.264 + AAC) saved to the device or shared straight to Instagram/WhatsApp via the system share sheet.
+5. **Export & share** — MP4 (H.264 + AAC) saved to the device or shared through the system share sheet.
 
 Everything runs in the browser. No account, no server, no network after the page loads.
 
