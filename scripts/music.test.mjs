@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -93,21 +94,20 @@ describe('beat maps', () => {
     });
 
     it('is reproduced byte for byte by scripts/beatmap.mjs', () => {
-      const regenerated = execFileSync(
-        'node',
-        [
-          'scripts/beatmap.mjs',
-          join(MUSIC_DIR, id, 'track.m4a'),
-          '--track-id',
-          id,
-          '--out',
-          '/dev/stdout',
-        ],
-        { encoding: 'utf8' },
-      );
-      expect(regenerated.split('\n')[0]).toBe(
-        readFileSync(join(MUSIC_DIR, id, 'beatmap.json'), 'utf8').trimEnd(),
-      );
+      const outDir = mkdtempSync(join(tmpdir(), 'beatmap-'));
+      const out = join(outDir, 'beatmap.json');
+      try {
+        execFileSync(
+          'node',
+          ['scripts/beatmap.mjs', join(MUSIC_DIR, id, 'track.m4a'), '--track-id', id, '--out', out],
+          { stdio: 'ignore' },
+        );
+        expect(readFileSync(out, 'utf8')).toBe(
+          readFileSync(join(MUSIC_DIR, id, 'beatmap.json'), 'utf8'),
+        );
+      } finally {
+        rmSync(outDir, { recursive: true, force: true });
+      }
     });
   });
 });
