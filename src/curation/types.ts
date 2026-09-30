@@ -1,5 +1,3 @@
-import type { ReelPlan } from '../types/reel-plan';
-
 /** RGBA pixels, same layout as ImageData. Only ever held in memory. */
 export interface PixelBuffer {
   width: number;
@@ -32,12 +30,13 @@ export interface Thresholds {
   spreadWeight: number;
 }
 
-export interface CurateOptions {
-  beatmap: BeatMap;
+/**
+ * Choosing photos needs no beat map: that only matters once a track is picked,
+ * when `planReel` turns the chosen photos into a plan.
+ */
+export interface SelectOptions {
   /** How many photos to keep. Default 10. */
   targetCount?: number;
-  /** Desired reel length, clamped to 15-30 s. Default 20 s. */
-  targetDurationMs?: number;
   /** Longest side of the downscaled working image. Default 512. */
   workingSize?: number;
   /** Stable ids, one per file. Default `photo-<index>`. */
@@ -58,7 +57,7 @@ export interface CurateProgress {
 
 export interface PhotoScore {
   photoId: string;
-  /** Index into the `files` array handed to `curate`. */
+  /** Index into the `files` array handed to `selectPhotos`. */
   index: number;
   selected: boolean;
   dropReason: DropReason | null;
@@ -94,8 +93,17 @@ export interface TimelineSummary {
   pickOrder: number;
 }
 
-export interface CurateResult {
-  plan: ReelPlan;
+/** A photo to put in the reel; the size, when known, lets `planReel` crop it to 9:16. */
+export interface PlanPhoto {
+  photoId: string;
+  /** Original pixel size; omit when unknown. */
+  width?: number;
+  height?: number;
+}
+
+export interface SelectResult {
+  /** The kept photos in reel order (timeline order), ready for `planReel`. */
+  chosen: PlanPhoto[];
   scores: PhotoScore[];
   timeline: TimelineSummary;
   ranIn: 'worker' | 'main-thread';

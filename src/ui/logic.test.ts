@@ -3,6 +3,7 @@ import {
   checkCount,
   crossfadeAlpha,
   cutsOnBeat,
+  dropReasonText,
   isHeic,
   move,
   rectAt,
@@ -94,5 +95,22 @@ describe('playback maths', () => {
       beatsMs: [0, 500, 1000, 1500, 2000, 4040],
     };
     expect(cutsOnBeat(plan([0, 2000, 4000, 5200]), beatmap)).toEqual({ onBeat: 2, cuts: 3 });
+  });
+});
+
+describe('dropReasonText', () => {
+  it('gives every drop reason words, and treats a missing one as ranked lower', () => {
+    const reasons = [
+      'decode-failed',
+      'blurry',
+      'underexposed',
+      'overexposed',
+      'near-duplicate',
+      'not-selected',
+    ] as const;
+    const texts = reasons.map(dropReasonText);
+    expect(texts.every((t) => t.length > 0)).toBe(true);
+    expect(new Set(texts).size).toBe(reasons.length);
+    expect(dropReasonText(null)).toBe(dropReasonText('not-selected'));
   });
 });

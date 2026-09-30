@@ -1,22 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { syntheticBeatMap } from './__fixtures__/beatmap';
 import { exifFile } from './__fixtures__/scenes';
 import { afterEach, vi } from 'vitest';
-import { curate } from './index';
+import { selectPhotos } from './index';
 
-describe('curate', () => {
+describe('selectPhotos', () => {
   it('runs on the main thread, and says so, where there is no Worker', async () => {
     // Node has neither Worker nor createImageBitmap: every photo fails to decode, the run does not.
-    const res = await curate([exifFile('a.heic', null), exifFile('b.heic', null)], {
-      beatmap: syntheticBeatMap(120, 60_000),
-    });
+    const res = await selectPhotos([exifFile('a.heic', null), exifFile('b.heic', null)], {});
     expect(res.ranIn).toBe('main-thread');
     expect(res.scores.map((s) => s.dropReason)).toEqual(['decode-failed', 'decode-failed']);
-    expect(res.plan.shots).toEqual([]);
+    expect(res.chosen).toEqual([]);
   });
 });
 
-describe('curate worker fallback', () => {
+describe('selectPhotos worker fallback', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('runs on the main thread, and says so, when the worker cannot start', async () => {
@@ -24,9 +21,7 @@ describe('curate worker fallback', () => {
       throw new Error('worker blocked');
     });
     vi.stubGlobal('OffscreenCanvas', function FakeOffscreenCanvas() {});
-    const res = await curate([exifFile('a.heic', null)], {
-      beatmap: syntheticBeatMap(120, 60_000),
-    });
+    const res = await selectPhotos([exifFile('a.heic', null)], {});
     expect(res.ranIn).toBe('main-thread');
   });
 
@@ -37,14 +32,14 @@ describe('curate worker fallback', () => {
       onmessageerror = null;
       postMessage() {
         this.onmessage?.({
-          data: { type: 'result', result: { plan: {}, scores: [], timeline: {} } },
+          data: { type: 'result', result: { chosen: [], scores: [], timeline: {} } },
         });
       }
       terminate() {}
     }
     vi.stubGlobal('Worker', OkWorker);
     vi.stubGlobal('OffscreenCanvas', function FakeOffscreenCanvas() {});
-    const res = await curate([], { beatmap: syntheticBeatMap(120, 60_000) });
+    const res = await selectPhotos([], {});
     expect(res.ranIn).toBe('worker');
   });
 });

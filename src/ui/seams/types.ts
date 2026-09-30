@@ -29,25 +29,13 @@ export interface BeatMap {
   beatsMs: number[];
 }
 
-// ASSUMED shape of the curation result: the brief only says "the chosen
-// ReelPlan plus per-photo scores". Isolated here and in seams/engines.ts.
-export interface PhotoScore {
-  photoId: string;
-  fileIndex: number; // index into the files array passed to curate()
-  score: number; // 0..1, higher is better
-  reason?: string; // why it was dropped, e.g. "blurry", "near-duplicate"
-}
-export interface CurateOptions {
-  targetCount?: number;
-  beatmap?: BeatMap;
-  // Plan exactly these files (indexes into `files`) in this order. Used when
-  // the user toggles or reorders, so the UI never re-implements planning.
-  include?: number[];
-}
-export interface CurateResult {
-  plan: ReelPlan;
-  scores: PhotoScore[];
-}
+// Curation is split the way the flow is: photos are chosen first (no beat map
+// exists yet), and a plan is built once a track is picked. These are the real
+// curation types, so a drift in their shape fails the build here.
+import type { PhotoScore, PlanPhoto, SelectOptions, SelectResult } from '../../curation/types';
+export type { PhotoScore, PlanPhoto, SelectOptions };
+/** What the UI reads from a selection run. */
+export type Selection = Pick<SelectResult, 'chosen' | 'scores'>;
 
 export interface Track {
   id: string;
@@ -65,7 +53,10 @@ export interface RenderOutcome {
 }
 
 export interface Engines {
-  curate(files: File[], opts: CurateOptions): Promise<CurateResult>;
+  /** Choose the best photos, in reel order. Needs no track. */
+  select(files: File[], opts: SelectOptions): Promise<Selection>;
+  /** Plan a reel from these photos, in this order, on a track's beats. */
+  plan(photos: PlanPhoto[], beatmap: BeatMap): ReelPlan;
   render(
     plan: ReelPlan,
     photos: Map<string, Blob>,

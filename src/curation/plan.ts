@@ -1,16 +1,10 @@
 import type { Rect, ReelPlan, ReelShot, Transition } from '../types/reel-plan';
-import type { BeatMap } from './types';
+import type { BeatMap, PlanPhoto } from './types';
 import { must } from './must';
-
-export interface PlanPhoto {
-  photoId: string;
-  /** Original pixel size; omit when unknown. */
-  width?: number;
-  height?: number;
-}
 
 export const MIN_REEL_MS = 15_000;
 export const MAX_REEL_MS = 30_000;
+export const DEFAULT_REEL_MS = 20_000;
 
 const FRAME_ASPECT = 9 / 16;
 const ZOOM_IN_TO = 1.2;
@@ -109,7 +103,7 @@ function shotEnds(
 export function buildPlan(
   chosen: PlanPhoto[],
   beatmap: BeatMap,
-  targetDurationMs: number,
+  targetDurationMs: number = DEFAULT_REEL_MS,
 ): ReelPlan {
   const header = {
     version: 1,

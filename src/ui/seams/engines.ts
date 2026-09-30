@@ -1,11 +1,12 @@
 import type {
   BeatMap,
-  CurateOptions,
-  CurateResult,
   Engines,
   LoadedTrack,
+  PlanPhoto,
   ReelPlan,
   RenderOutcome,
+  SelectOptions,
+  Selection,
   Track,
 } from './types';
 import { fakeEngines } from './fakes';
@@ -15,20 +16,36 @@ import { fakeEngines } from './fakes';
 const curationMods = import.meta.glob('../../curation/index.ts');
 const renderMods = import.meta.glob('../../render/index.ts');
 
-// Track ids are owned by the music workstream (public/music/<trackId>/).
-// ASSUMED until that lands: the three moods named in docs/scout-technical.md.
-export const TRACKS: Track[] = [
-  { id: 'chill', title: 'Chill', mood: 'Slow lo-fi, soft cuts' },
-  { id: 'upbeat', title: 'Upbeat', mood: 'Bright and quick' },
-  { id: 'cinematic', title: 'Cinematic', mood: 'Wide and dramatic' },
-];
+/** One entry of public/music/index.json, written by the music workstream's tooling. */
+interface CatalogueTrack extends Track {
+  track: string;
+  beatmap: string;
+}
 
-async function loadRealTrack(track: Track): Promise<LoadedTrack> {
-  const base = `${import.meta.env.BASE_URL}music/${track.id}/`;
-  const res = await fetch(`${base}beatmap.json`);
-  if (!res.ok) throw new Error(`Beat map for "${track.title}" is missing (${res.status}).`);
+const CATALOGUE_PATH = 'music/index.json';
+
+/** The shipped tracks, read at runtime so the UI can never offer an id that is not bundled. */
+async function loadCatalogue(): Promise<CatalogueTrack[]> {
+  const res = await fetch(`${import.meta.env.BASE_URL}${CATALOGUE_PATH}`);
+  if (!res.ok) throw new Error(`The music catalogue is missing (${res.status}).`);
+  const body = (await res.json()) as { tracks?: CatalogueTrack[] };
+  if (!Array.isArray(body.tracks) || body.tracks.length === 0)
+    throw new Error('The music catalogue lists no tracks.');
+  return body.tracks;
+}
+
+async function loadRealTrack(entry: CatalogueTrack): Promise<LoadedTrack> {
+  const base = import.meta.env.BASE_URL;
+  const res = await fetch(`${base}${entry.beatmap}`);
+  if (!res.ok) throw new Error(`Beat map for "${entry.title}" is missing (${res.status}).`);
   const beatmap = (await res.json()) as BeatMap;
-  return { ...track, audioUrl: `${base}track.m4a`, beatmap };
+  return {
+    id: entry.id,
+    title: entry.title,
+    mood: entry.mood,
+    audioUrl: `${base}${entry.track}`,
+    beatmap,
+  };
 }
 
 export async function realEngines(): Promise<Partial<Engines>> {
@@ -36,9 +53,11 @@ export async function realEngines(): Promise<Partial<Engines>> {
   const curateLoader = curationMods['../../curation/index.ts'];
   if (curateLoader) {
     const mod = (await curateLoader()) as {
-      curate: (f: File[], o: CurateOptions) => Promise<CurateResult>;
+      selectPhotos: (f: File[], o: SelectOptions) => Promise<Selection>;
+      planReel: (p: PlanPhoto[], b: BeatMap) => ReelPlan;
     };
-    out.curate = mod.curate;
+    out.select = mod.selectPhotos;
+    out.plan = mod.planReel;
   }
   const renderLoader = renderMods['../../render/index.ts'];
   if (renderLoader) {
@@ -64,19 +83,17 @@ export async function resolveEngines(forceFake = false): Promise<Engines> {
   const fake = fakeEngines();
   if (forceFake) return fake;
   const real = await realEngines();
-  const usesFake = !real.curate || !real.render;
+  const usesFake = !real.select || !real.plan || !real.render;
+  const catalogue = await loadCatalogue();
   return {
-    curate: real.curate ?? fake.curate,
+    select: real.select ?? fake.select,
+    plan: real.plan ?? fake.plan,
     render: real.render ?? fake.render,
-    tracks: TRACKS,
-    loadTrack: (id) => {
-      const track = TRACKS.find((t) => t.id === id);
-      if (!track) throw new Error(`Unknown track ${id}`);
-      return loadRealTrack(track).catch((err) => {
-        // Music workstream not landed: fall back to the fake demo track.
-        if (usesFake) return fake.loadTrack(id);
-        throw err;
-      });
+    tracks: catalogue.map(({ id, title, mood }) => ({ id, title, mood })),
+    loadTrack: async (id) => {
+      const entry = catalogue.find((t) => t.id === id);
+      if (!entry) throw new Error(`Unknown track ${id}`);
+      return loadRealTrack(entry);
     },
     fake: usesFake,
   };

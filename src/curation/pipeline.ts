@@ -2,12 +2,11 @@ import { decodePhoto, type Decoded } from './decode';
 import { collapseDuplicates } from './dedupe';
 import { dHash } from './dhash';
 import { analyzeExposure } from './exposure';
-import { buildPlan } from './plan';
 import { classify, mergeThresholds, qualityScore } from './score';
 import { selectSpread } from './select';
 import { laplacianVariance, sharpnessScore } from './sharpness';
 import { normaliseTimes, readExifDate, resolveTimes } from './timestamp';
-import type { CurateOptions, CurateResult, PhotoScore, TimelineSummary } from './types';
+import type { PhotoScore, SelectOptions, SelectResult, TimelineSummary } from './types';
 import { must } from './must';
 
 export interface PipelineDeps {
@@ -15,10 +14,9 @@ export interface PipelineDeps {
   readExif?: (file: File) => Promise<number | null>;
 }
 
-export type CurateOutcome = Omit<CurateResult, 'ranIn'>;
+export type SelectOutcome = Omit<SelectResult, 'ranIn'>;
 
 const DEFAULT_TARGET_COUNT = 10;
-const DEFAULT_DURATION_MS = 20_000;
 const DEFAULT_WORKING_SIZE = 512;
 
 /** What survives from a photo once its pixels have been measured and let go. */
@@ -65,15 +63,15 @@ function summarise(scores: PhotoScore[]): TimelineSummary {
 }
 
 /**
- * The whole curation pipeline. Photos are decoded one at a time and only their
+ * The photo-selection pipeline. Photos are decoded one at a time and only their
  * measurements are kept, so memory stays bounded and nothing derived from a
  * photo outlives this call except numbers and a 64-bit hash.
  */
 export async function runCuration(
   files: File[],
-  opts: CurateOptions,
+  opts: SelectOptions,
   deps: PipelineDeps = {},
-): Promise<CurateOutcome> {
+): Promise<SelectOutcome> {
   const targetCount = Number.isFinite(opts.targetCount)
     ? Math.max(0, Math.floor(opts.targetCount ?? 0))
     : DEFAULT_TARGET_COUNT;
@@ -171,12 +169,11 @@ export async function runCuration(
   const chosen = scores
     .filter((s) => s.selected)
     .sort((a, b) => must(t[a.index]) - must(t[b.index]) || a.index - b.index);
-  const plan = buildPlan(
-    chosen.map((s) => ({ photoId: s.photoId, width: s.width, height: s.height })),
-    opts.beatmap,
-    opts.targetDurationMs ?? DEFAULT_DURATION_MS,
-  );
 
   opts.onProgress?.({ stage: 'done', done: files.length, total: files.length });
-  return { plan, scores, timeline: summarise(scores) };
+  return {
+    chosen: chosen.map((s) => ({ photoId: s.photoId, width: s.width, height: s.height })),
+    scores,
+    timeline: summarise(scores),
+  };
 }
