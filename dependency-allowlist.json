@@ -8,6 +8,7 @@
     "audio-decode",
     "eslint",
     "eslint-config-prettier",
+    "exifr",
     "prettier",
     "typescript",
     "typescript-eslint",
