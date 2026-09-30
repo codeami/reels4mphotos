@@ -1,0 +1,19 @@
+License: CC0 1.0 Universal (Public Domain Dedication)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+Title: Ease into Night ( Lofi , Relax , Chill )
+Artist: HoliznaCC0
+Album: Public Domain Lofi
+Source URL: https://freemusicarchive.org/music/holiznacc0/public-domain-lofi/ease-into-night-lofi-relax-chill/
+Artist page: https://freemusicarchive.org/music/holiznacc0/
+Original file: https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/XobMN43VCXdGmXCTuVc964P0O4gzMe0p2RoPTLKC.mp3
+Retrieved: 2026-10-01
+
+Verification: on 2026-10-01 the track page above, for this track itself (not just
+the site or album), states: "Ease into Night ( Lofi , Relax , Chill ) by HoliznaCC0 is licensed under a CC0 1.0
+Universal License", linking to the licence URL above. Free Music Archive lists the
+track under the artist HoliznaCC0 on that page.
+
+Modifications (CC0 requires none; recorded for provenance): a 45 s excerpt starting
+19.75 s into the original, 0.5 s fade-in, 2 s fade-out, loudness-normalised to
+-16 LUFS integrated, encoded as 128 kbps AAC in M4A. Made with scripts/prepare-track.sh.

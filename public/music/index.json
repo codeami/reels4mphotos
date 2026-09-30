@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "tracks": [
+    {
+      "id": "chill-ease-into-night",
+      "title": "Ease into Night",
+      "mood": "chill",
+      "durationMs": 45000,
+      "track": "music/chill-ease-into-night/track.m4a",
+      "beatmap": "music/chill-ease-into-night/beatmap.json"
+    },
+    {
+      "id": "upbeat-ruby-2",
+      "title": "Ruby 2",
+      "mood": "upbeat",
+      "durationMs": 45000,
+      "track": "music/upbeat-ruby-2/track.m4a",
+      "beatmap": "music/upbeat-ruby-2/beatmap.json"
+    },
+    {
+      "id": "cinematic-dangerous-voyage",
+      "title": "Dangerous Voyage",
+      "mood": "cinematic",
+      "durationMs": 45000,
+      "track": "music/cinematic-dangerous-voyage/track.m4a",
+      "beatmap": "music/cinematic-dangerous-voyage/beatmap.json"
+    }
+  ]
+}
