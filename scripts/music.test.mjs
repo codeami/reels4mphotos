@@ -9,7 +9,9 @@ const BPM_RANGE = [60, 200];
 const DURATION_RANGE_MS = [30_000, 60_000];
 
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
-const trackDirs = readdirSync(MUSIC_DIR).filter((name) => statSync(join(MUSIC_DIR, name)).isDirectory());
+const trackDirs = readdirSync(MUSIC_DIR).filter((name) =>
+  statSync(join(MUSIC_DIR, name)).isDirectory(),
+);
 const audioFilesUnder = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
@@ -19,18 +21,23 @@ const audioFilesUnder = (dir) =>
 
 describe('licences', () => {
   it('has a LICENSE.txt beside every audio file under public/music', () => {
-    const unlicensed = audioFilesUnder(MUSIC_DIR).filter((file) => !existsSync(join(file, '..', 'LICENSE.txt')));
+    const unlicensed = audioFilesUnder(MUSIC_DIR).filter(
+      (file) => !existsSync(join(file, '..', 'LICENSE.txt')),
+    );
     expect(unlicensed).toEqual([]);
   });
 
-  it.each(trackDirs)('%s LICENSE.txt records licence, title, artist, source URL and retrieval date', (id) => {
-    const text = readFileSync(join(MUSIC_DIR, id, 'LICENSE.txt'), 'utf8');
-    expect(text).toMatch(/^License: CC0 1\.0 Universal/m);
-    expect(text).toMatch(/^Title: .+/m);
-    expect(text).toMatch(/^Artist: .+/m);
-    expect(text).toMatch(/^Source URL: https:\/\/.+/m);
-    expect(text).toMatch(/^Retrieved: \d{4}-\d{2}-\d{2}$/m);
-  });
+  it.each(trackDirs)(
+    '%s LICENSE.txt records licence, title, artist, source URL and retrieval date',
+    (id) => {
+      const text = readFileSync(join(MUSIC_DIR, id, 'LICENSE.txt'), 'utf8');
+      expect(text).toMatch(/^License: CC0 1\.0 Universal/m);
+      expect(text).toMatch(/^Title: .+/m);
+      expect(text).toMatch(/^Artist: .+/m);
+      expect(text).toMatch(/^Source URL: https:\/\/.+/m);
+      expect(text).toMatch(/^Retrieved: \d{4}-\d{2}-\d{2}$/m);
+    },
+  );
 });
 
 describe('beat maps', () => {
@@ -43,7 +50,13 @@ describe('beat maps', () => {
 
     it('has the shared-seams shape', () => {
       const map = load();
-      expect(Object.keys(map).sort()).toEqual(['beatsMs', 'bpm', 'durationMs', 'trackId', 'version']);
+      expect(Object.keys(map).sort()).toEqual([
+        'beatsMs',
+        'bpm',
+        'durationMs',
+        'trackId',
+        'version',
+      ]);
       expect(map.version).toBe(1);
       expect(map.trackId).toBe(id);
       expect(map.beatsMs.every(Number.isInteger)).toBe(true);
@@ -61,7 +74,8 @@ describe('beat maps', () => {
       const map = load();
       expect(map.bpm).toBeGreaterThanOrEqual(BPM_RANGE[0]);
       expect(map.bpm).toBeLessThanOrEqual(BPM_RANGE[1]);
-      const impliedBpm = (60_000 * (map.beatsMs.length - 1)) / (map.beatsMs.at(-1) - map.beatsMs[0]);
+      const impliedBpm =
+        (60_000 * (map.beatsMs.length - 1)) / (map.beatsMs.at(-1) - map.beatsMs[0]);
       expect(impliedBpm).toBeGreaterThanOrEqual(BPM_RANGE[0]);
       expect(impliedBpm).toBeLessThanOrEqual(BPM_RANGE[1]);
     });
@@ -81,10 +95,19 @@ describe('beat maps', () => {
     it('is reproduced byte for byte by scripts/beatmap.mjs', () => {
       const regenerated = execFileSync(
         'node',
-        ['scripts/beatmap.mjs', join(MUSIC_DIR, id, 'track.m4a'), '--track-id', id, '--out', '/dev/stdout'],
+        [
+          'scripts/beatmap.mjs',
+          join(MUSIC_DIR, id, 'track.m4a'),
+          '--track-id',
+          id,
+          '--out',
+          '/dev/stdout',
+        ],
         { encoding: 'utf8' },
       );
-      expect(regenerated.split('\n')[0]).toBe(readFileSync(join(MUSIC_DIR, id, 'beatmap.json'), 'utf8').trimEnd());
+      expect(regenerated.split('\n')[0]).toBe(
+        readFileSync(join(MUSIC_DIR, id, 'beatmap.json'), 'utf8').trimEnd(),
+      );
     });
   });
 });

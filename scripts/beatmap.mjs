@@ -66,9 +66,12 @@ function toMono(channels) {
 export function onsetStrength(samples, sampleRate) {
   const hop = Math.round(sampleRate / HOP_PER_SECOND);
   const frames = Math.max(0, Math.floor((samples.length - FFT_SIZE) / hop) + 1);
-  const window = Float64Array.from({ length: FFT_SIZE }, (_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / FFT_SIZE));
+  const window = Float64Array.from(
+    { length: FFT_SIZE },
+    (_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / FFT_SIZE),
+  );
   const edges = Array.from({ length: BANDS + 1 }, (_, b) =>
-    Math.round(((BAND_MIN_HZ * (BAND_MAX_HZ / BAND_MIN_HZ) ** (b / BANDS)) * FFT_SIZE) / sampleRate),
+    Math.round((BAND_MIN_HZ * (BAND_MAX_HZ / BAND_MIN_HZ) ** (b / BANDS) * FFT_SIZE) / sampleRate),
   );
   const re = new Float64Array(FFT_SIZE);
   const im = new Float64Array(FFT_SIZE);
@@ -110,7 +113,8 @@ export function estimatePeriod(env, frameSeconds) {
     for (let i = lag; i < env.length; i++) acc += env[i] * env[i - lag];
     const bpm = 60 / (lag * frameSeconds);
     const octaves = Math.log2(bpm / BPM_PRIOR_CENTRE);
-    const score = (acc / (env.length - lag)) * Math.exp(-0.5 * (octaves / BPM_PRIOR_SIGMA_OCTAVES) ** 2);
+    const score =
+      (acc / (env.length - lag)) * Math.exp(-0.5 * (octaves / BPM_PRIOR_SIGMA_OCTAVES) ** 2);
     if (score > best.score) best = { lag, score };
   }
   // Parabolic refinement so the period is not quantised to whole frames.
@@ -161,7 +165,10 @@ export function analyse({ channels, sampleRate }, trackId) {
   const norm = normalise(env);
   const period = estimatePeriod(norm, frameSeconds);
   const beatsMs = trackBeats(norm, period).map((f) => Math.round(f * frameSeconds * 1000));
-  const gaps = beatsMs.slice(1).map((ms, i) => ms - beatsMs[i]).sort((a, b) => a - b);
+  const gaps = beatsMs
+    .slice(1)
+    .map((ms, i) => ms - beatsMs[i])
+    .sort((a, b) => a - b);
   const medianGap = gaps[Math.floor(gaps.length / 2)];
   return {
     version: 1,
@@ -181,7 +188,9 @@ async function main(argv) {
   const file = args.find((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith('--'));
   const trackId = flag('--track-id') ?? basename(dirname(file ?? ''));
   if (!file || !trackId) {
-    console.error('usage: node scripts/beatmap.mjs <audio-file> --track-id <id> [--out <beatmap.json>]');
+    console.error(
+      'usage: node scripts/beatmap.mjs <audio-file> --track-id <id> [--out <beatmap.json>]',
+    );
     process.exit(2);
   }
   const audio = await decode(await readFile(file));
