@@ -1,11 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { checkCount, crossfadeAlpha, cutsOnBeat, isHeic, move, rectAt, shotIndexAt, toggle } from './logic';
-import type { ReelPlan } from './seams/types';
+import {
+  checkCount,
+  crossfadeAlpha,
+  cutsOnBeat,
+  isHeic,
+  move,
+  rectAt,
+  shotIndexAt,
+  toggle,
+} from './logic';
+import type { ReelPlan, ReelShot } from './seams/types';
 
 const r = { x: 0, y: 0, w: 1, h: 1 };
 const plan = (starts: number[]): ReelPlan => ({
-  version: 1, width: 1080, height: 1920, fps: 30, trackId: 't', totalMs: 9000,
-  shots: starts.map((startMs, i) => ({ photoId: `p${i}`, startMs, durationMs: 1000, transition: i === 1 ? 'crossfade' : 'cut', kenBurns: { from: r, to: r } })),
+  version: 1,
+  width: 1080,
+  height: 1920,
+  fps: 30,
+  trackId: 't',
+  totalMs: 9000,
+  shots: starts.map((startMs, i) => ({
+    photoId: `p${i}`,
+    startMs,
+    durationMs: 1000,
+    transition: i === 1 ? 'crossfade' : 'cut',
+    kenBurns: { from: r, to: r },
+  })),
 });
 
 describe('move', () => {
@@ -22,8 +42,10 @@ describe('move', () => {
 
 describe('toggle', () => {
   const all = ['a', 'b', 'c', 'd'];
-  it('removes a selected photo', () => expect(toggle(['a', 'b', 'c'], all, 'b')).toEqual(['a', 'c']));
-  it('re-adds a photo at its original rank', () => expect(toggle(['a', 'c'], all, 'b')).toEqual(['a', 'b', 'c']));
+  it('removes a selected photo', () =>
+    expect(toggle(['a', 'b', 'c'], all, 'b')).toEqual(['a', 'c']));
+  it('re-adds a photo at its original rank', () =>
+    expect(toggle(['a', 'c'], all, 'b')).toEqual(['a', 'b', 'c']));
   it('appends when it ranks last', () => expect(toggle(['a'], all, 'd')).toEqual(['a', 'd']));
 });
 
@@ -59,12 +81,18 @@ describe('playback maths', () => {
   });
   it('fades the previous shot only for crossfades', () => {
     const p = plan([0, 2000, 4000]);
-    expect(crossfadeAlpha(p.shots[1], 2000)).toBe(1);
-    expect(crossfadeAlpha(p.shots[1], 2300)).toBe(0);
-    expect(crossfadeAlpha(p.shots[2], 4000)).toBe(0);
+    expect(crossfadeAlpha(p.shots[1] as ReelShot, 2000)).toBe(1);
+    expect(crossfadeAlpha(p.shots[1] as ReelShot, 2300)).toBe(0);
+    expect(crossfadeAlpha(p.shots[2] as ReelShot, 4000)).toBe(0);
   });
   it('counts cuts that land within tolerance of a beat', () => {
-    const beatmap = { version: 1 as const, trackId: 't', durationMs: 9000, bpm: 120, beatsMs: [0, 500, 1000, 1500, 2000, 4040] };
+    const beatmap = {
+      version: 1 as const,
+      trackId: 't',
+      durationMs: 9000,
+      bpm: 120,
+      beatsMs: [0, 500, 1000, 1500, 2000, 4040],
+    };
     expect(cutsOnBeat(plan([0, 2000, 4000, 5200]), beatmap)).toEqual({ onBeat: 2, cuts: 3 });
   });
 });

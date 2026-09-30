@@ -9,6 +9,8 @@ import type { Engines } from './seams/types';
  * modules are used when present and marked fakes stand in otherwise.
  */
 export async function mountApp(root: HTMLElement, engines?: Engines) {
-  const resolved = engines ?? (await resolveEngines());
+  // ?fakes=1 pins the deterministic demo engines; the E2E tests rely on it.
+  const pinFakes = new URLSearchParams(location.search).get('fakes') === '1';
+  const resolved = engines ?? (await resolveEngines(pinFakes));
   return createApp(root, resolved);
 }

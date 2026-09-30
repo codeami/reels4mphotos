@@ -26,10 +26,13 @@ export class Player {
     this.seek(0);
   }
 
-  get isPlaying() { return this.playing; }
+  get isPlaying() {
+    return this.playing;
+  }
 
   private now(): number {
-    if (this.audio && !this.audio.paused && this.audio.readyState >= 2) return this.audio.currentTime * 1000;
+    if (this.audio && !this.audio.paused && this.audio.readyState >= 2)
+      return this.audio.currentTime * 1000;
     return this.offsetMs + (performance.now() - this.startedAt);
   }
 
@@ -92,7 +95,17 @@ export class Player {
     const t = (ms - shot.startMs) / shot.durationMs;
     const r = rectAt(shot.kenBurns.from, shot.kenBurns.to, t);
     this.ctx.globalAlpha = alpha;
-    this.ctx.drawImage(bmp, r.x * bmp.width, r.y * bmp.height, r.w * bmp.width, r.h * bmp.height, 0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.drawImage(
+      bmp,
+      r.x * bmp.width,
+      r.y * bmp.height,
+      r.w * bmp.width,
+      r.h * bmp.height,
+      0,
+      0,
+      this.canvas.width,
+      this.canvas.height,
+    );
     this.ctx.globalAlpha = 1;
   }
 
@@ -102,7 +115,8 @@ export class Player {
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     const i = shotIndexAt(this.plan, ms);
     this.drawShot(i, ms, 1);
-    const fade = crossfadeAlpha(this.plan.shots[i], ms);
+    const current = this.plan.shots[i];
+    const fade = current ? crossfadeAlpha(current, ms) : 0;
     if (fade > 0 && i > 0) this.drawShot(i - 1, ms, fade);
   }
 }

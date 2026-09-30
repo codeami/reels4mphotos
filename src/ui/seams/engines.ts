@@ -1,4 +1,13 @@
-import type { BeatMap, CurateOptions, CurateResult, Engines, LoadedTrack, ReelPlan, RenderOutcome, Track } from './types';
+import type {
+  BeatMap,
+  CurateOptions,
+  CurateResult,
+  Engines,
+  LoadedTrack,
+  ReelPlan,
+  RenderOutcome,
+  Track,
+} from './types';
 import { fakeEngines } from './fakes';
 
 // Real modules are picked up when they exist on the branch; glob resolves to
@@ -34,7 +43,12 @@ export async function realEngines(): Promise<Partial<Engines>> {
   const renderLoader = renderMods['../../render/index.ts'];
   if (renderLoader) {
     const mod = (await renderLoader()) as {
-      renderReel: (p: ReelPlan, ph: Map<string, Blob>, b: BeatMap, cb: (n: number) => void) => Promise<Blob>;
+      renderReel: (
+        p: ReelPlan,
+        ph: Map<string, Blob>,
+        b: BeatMap,
+        cb: (n: number) => void,
+      ) => Promise<Blob>;
     };
     out.render = async (plan, photos, beatmap, onProgress): Promise<RenderOutcome> => {
       const blob = await mod.renderReel(plan, photos, beatmap, onProgress);

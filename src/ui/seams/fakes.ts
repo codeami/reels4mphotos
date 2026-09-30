@@ -2,7 +2,16 @@
 // workstreams so the UI runs and tests before they land. They contain no real
 // curation or encoding logic and must never ship as the real thing: the UI
 // shows a "demo engine" badge whenever any of this is in use.
-import type { BeatMap, CurateOptions, CurateResult, Engines, LoadedTrack, ReelPlan, ReelShot, Track } from './types';
+import type {
+  BeatMap,
+  CurateOptions,
+  CurateResult,
+  Engines,
+  LoadedTrack,
+  ReelPlan,
+  ReelShot,
+  Track,
+} from './types';
 
 const FAKE_TRACKS: Array<Track & { bpm: number }> = [
   { id: 'chill', title: 'Chill', mood: 'Slow lo-fi, soft cuts', bpm: 84 },
@@ -24,11 +33,20 @@ function clickWav(beatsMs: number[], durationMs: number): string {
   const n = Math.floor((durationMs / 1000) * rate);
   const buf = new ArrayBuffer(44 + n * 2);
   const v = new DataView(buf);
-  const str = (o: number, s: string) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
-  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt ');
-  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true);
-  v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n * 2, true);
+  const str = (o: number, s: string) =>
+    [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF');
+  v.setUint32(4, 36 + n * 2, true);
+  str(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true);
+  v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  str(36, 'data');
+  v.setUint32(40, n * 2, true);
   for (const b of beatsMs) {
     const s = Math.floor((b / 1000) * rate);
     for (let i = 0; i < 400 && s + i < n; i++) {
@@ -50,10 +68,10 @@ const REASONS = ['Looks blurry', 'Near-duplicate of another shot', 'Too dark', '
 function buildPlan(order: Array<{ photoId: string }>, beatmap: BeatMap | undefined): ReelPlan {
   const beats = beatmap?.beatsMs ?? Array.from({ length: 80 }, (_, i) => i * 500);
   // Each shot spans 4 beats; cuts land exactly on beat times.
-  const stride = Math.max(2, Math.round(2200 / ((beats[1] ?? 500) - beats[0])));
+  const stride = Math.max(2, Math.round(2200 / ((beats[1] ?? 500) - (beats[0] ?? 0))));
   const shots: ReelShot[] = order.map((p, i) => {
-    const startMs = beats[Math.min(i * stride, beats.length - 1)];
-    const endMs = beats[Math.min((i + 1) * stride, beats.length - 1)];
+    const startMs = beats[Math.min(i * stride, beats.length - 1)] ?? 0;
+    const endMs = beats[Math.min((i + 1) * stride, beats.length - 1)] ?? startMs;
     const zoomIn = i % 2 === 0;
     const wide = { x: 0.1, y: 0.05, w: 0.8, h: 0.9 };
     const tight = { x: 0.25, y: 0.2, w: 0.5, h: 0.6 };
@@ -67,7 +85,10 @@ function buildPlan(order: Array<{ photoId: string }>, beatmap: BeatMap | undefin
   });
   const last = shots[shots.length - 1];
   return {
-    version: 1, width: 1080, height: 1920, fps: 30,
+    version: 1,
+    width: 1080,
+    height: 1920,
+    fps: 30,
     trackId: beatmap?.trackId ?? 'chill',
     totalMs: last ? last.startMs + last.durationMs : 0,
     shots,
@@ -88,14 +109,26 @@ async function fakeCurate(files: File[], opts: CurateOptions): Promise<CurateRes
   if (opts.include) chosen = opts.include;
   else {
     const target = Math.min(opts.targetCount ?? 10, scored.length);
-    chosen = [...scored].sort((a, b) => b.score - a.score).slice(0, target).map((s) => s.fileIndex).sort((a, b) => a - b);
+    chosen = [...scored]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, target)
+      .map((s) => s.fileIndex)
+      .sort((a, b) => a - b);
   }
   const scores = scored.map((s) => ({
     ...s,
-    reason: chosen.includes(s.fileIndex) ? undefined : REASONS[Math.floor(hash(s.photoId) * REASONS.length)],
+    reason: chosen.includes(s.fileIndex)
+      ? undefined
+      : REASONS[Math.floor(hash(s.photoId) * REASONS.length)],
   }));
   await new Promise((r) => setTimeout(r, 250));
-  return { plan: buildPlan(chosen.map((i) => scored[i]), opts.beatmap), scores };
+  return {
+    plan: buildPlan(
+      chosen.flatMap((i) => (scored[i] ? [scored[i]] : [])),
+      opts.beatmap,
+    ),
+    scores,
+  };
 }
 
 export function fakeEngines(): Engines {
@@ -108,7 +141,13 @@ export function fakeEngines(): Engines {
       const t = FAKE_TRACKS.find((x) => x.id === id);
       if (!t) throw new Error(`Unknown track ${id}`);
       const beatmap = fakeBeatmap(id, t.bpm);
-      return { id: t.id, title: t.title, mood: t.mood, beatmap, audioUrl: clickWav(beatmap.beatsMs, TRACK_MS) };
+      return {
+        id: t.id,
+        title: t.title,
+        mood: t.mood,
+        beatmap,
+        audioUrl: clickWav(beatmap.beatsMs, TRACK_MS),
+      };
     },
     async render(_plan, _photos, _beatmap, onProgress) {
       for (let i = 1; i <= 10; i++) {

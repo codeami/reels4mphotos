@@ -35,8 +35,18 @@ export interface State {
 }
 
 export const initialState = (): State => ({
-  step: 'add', busy: null, files: [], skipped: [], notice: null, photos: [], order: [],
-  plan: null, trackId: null, track: null, exp: { kind: 'idle' }, announce: '',
+  step: 'add',
+  busy: null,
+  files: [],
+  skipped: [],
+  notice: null,
+  photos: [],
+  order: [],
+  plan: null,
+  trackId: null,
+  track: null,
+  exp: { kind: 'idle' },
+  announce: '',
 });
 
 export type Listener = (s: State) => void;

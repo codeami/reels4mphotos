@@ -1,5 +1,8 @@
 type Child = Node | string | null | false | undefined;
-type Props = Record<string, string | number | boolean | EventListener | null | undefined>;
+type Props = Record<
+  string,
+  string | number | boolean | EventListener | Partial<CSSStyleDeclaration> | null | undefined
+>;
 
 /** Tiny hyperscript helper. Text goes through textContent, never innerHTML. */
 export function h<K extends keyof HTMLElementTagNameMap>(
@@ -10,7 +13,10 @@ export function h<K extends keyof HTMLElementTagNameMap>(
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
     if (v === null || v === undefined || v === false) continue;
-    if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v as EventListener);
+    // CSP has no 'unsafe-inline' for styles: set styles through CSSOM, never a style attribute.
+    if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k.startsWith('on') && typeof v === 'function')
+      el.addEventListener(k.slice(2).toLowerCase(), v as EventListener);
     else if (k === 'class') el.className = String(v);
     else if (v === true) el.setAttribute(k, '');
     else el.setAttribute(k, String(v));

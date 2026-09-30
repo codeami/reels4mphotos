@@ -38,7 +38,9 @@ export function enableDragReorder(opts: ReorderOptions): void {
 
     const findSlot = (x: number, y: number): number => {
       const scrolled = window.scrollY - scrollAtStart;
-      const hit = rects.findIndex((r) => x >= r.left && x <= r.right && y + scrolled >= r.top && y + scrolled <= r.bottom);
+      const hit = rects.findIndex(
+        (r) => x >= r.left && x <= r.right && y + scrolled >= r.top && y + scrolled <= r.bottom,
+      );
       return hit === -1 ? to : hit;
     };
     const paint = (x: number, y: number) => {
@@ -51,7 +53,10 @@ export function enableDragReorder(opts: ReorderOptions): void {
     const autoScroll = () => {
       if (lastY < EDGE) window.scrollBy(0, -SCROLL_STEP);
       else if (lastY > window.innerHeight - EDGE) window.scrollBy(0, SCROLL_STEP);
-      else { raf = requestAnimationFrame(autoScroll); return; }
+      else {
+        raf = requestAnimationFrame(autoScroll);
+        return;
+      }
       paint(lastX, lastY);
       raf = requestAnimationFrame(autoScroll);
     };
@@ -59,7 +64,8 @@ export function enableDragReorder(opts: ReorderOptions): void {
 
     const onPointerMove = (e: PointerEvent) => {
       if (e.pointerId !== down.pointerId) return;
-      lastX = e.clientX; lastY = e.clientY;
+      lastX = e.clientX;
+      lastY = e.clientY;
       paint(lastX, lastY);
     };
     const finish = (e: PointerEvent, commit: boolean) => {
