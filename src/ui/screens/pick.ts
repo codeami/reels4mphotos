@@ -1,5 +1,5 @@
 import { h } from '../dom';
-import { MIN_PHOTOS } from '../logic';
+import { dropReasonText, MIN_PHOTOS } from '../logic';
 import type { Photo, State } from '../store';
 
 export interface PickActions {
@@ -131,14 +131,15 @@ export function pickScreen(s: State, a: PickActions): HTMLElement {
                 {
                   class: 'tile-img tile-add',
                   type: 'button',
-                  'aria-label': `Add back ${p.file.name}. Left out because: ${p.score.reason ?? 'ranked lower'}`,
+                  'aria-label': `Add back ${p.file.name}. Left out because: ${dropReasonText(p.score.dropReason)}`,
                   onclick: () => a.onToggle(p.id),
                 },
                 thumb(p),
                 h('span', { class: 'tile-plus', 'aria-hidden': 'true' }, '+'),
               ),
-              h('p', { class: 'why' }, p.score.reason ?? 'Ranked lower'),
-              h('p', { class: 'score' }, `score ${pct(p.score.score)}`),
+              h('p', { class: 'why' }, dropReasonText(p.score.dropReason)),
+              p.score.quality !== undefined &&
+                h('p', { class: 'score' }, `score ${pct(p.score.quality)}`),
             ),
           ),
         ),

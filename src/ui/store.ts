@@ -25,7 +25,7 @@ export interface State {
   files: File[]; // accepted, decodable files, in pick order
   skipped: Skipped[];
   notice: string | null; // count-range message etc.
-  photos: Photo[]; // after curation, indexed by fileIndex
+  photos: Photo[]; // after selection, in `files` order
   order: string[]; // photoIds in the reel, in play order
   plan: ReelPlan | null;
   trackId: string | null;

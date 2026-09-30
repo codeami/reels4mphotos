@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { syntheticBeatMap } from './__fixtures__/beatmap';
 import {
   boxBlur,
   clippedHighlights,
@@ -11,8 +10,6 @@ import { DecodeError } from './decode';
 import { runCuration, type PipelineDeps } from './pipeline';
 import type { CurateProgress, PixelBuffer } from './types';
 import { must } from './must';
-
-const beatmap = syntheticBeatMap(120, 60_000);
 
 /** A decoder stub keyed by file name, so the pipeline runs without a browser. */
 function stubDeps(pixels: Record<string, PixelBuffer | Error>): PipelineDeps {
@@ -50,7 +47,7 @@ function scenario() {
 describe('runCuration', () => {
   it('drops blurry, badly exposed, near-duplicate and undecodable photos with a reason', async () => {
     const { files, pixels } = scenario();
-    const res = await runCuration(files, { beatmap, targetCount: 10 }, stubDeps(pixels));
+    const res = await runCuration(files, { targetCount: 10 }, stubDeps(pixels));
     const byName = new Map(files.map((f, i) => [f.name, must(res.scores[i])]));
 
     expect(byName.get('blurry.jpg')).toMatchObject({ selected: false, dropReason: 'blurry' });
@@ -74,25 +71,23 @@ describe('runCuration', () => {
 
   it('collapses the near-duplicate pair to one and records which photo it collapsed into', async () => {
     const { files, pixels } = scenario();
-    const res = await runCuration(files, { beatmap }, stubDeps(pixels));
+    const res = await runCuration(files, {}, stubDeps(pixels));
     const dropped = must(res.scores.find((s) => s.dropReason === 'near-duplicate'));
     const keeper = must(res.scores.find((s) => s.photoId === dropped.duplicateOf));
     expect(keeper.selected).toBe(true);
   });
 
-  it('selects every survivor when fewer than N remain, and plans exactly those', async () => {
+  it('selects every survivor when fewer than N remain, and chooses exactly those', async () => {
     const { files, pixels } = scenario();
-    const res = await runCuration(files, { beatmap, targetCount: 10 }, stubDeps(pixels));
+    const res = await runCuration(files, { targetCount: 10 }, stubDeps(pixels));
     const selected = res.scores.filter((s) => s.selected);
     expect(selected).toHaveLength(6);
-    expect(res.plan.shots.map((s) => s.photoId).sort()).toEqual(
-      selected.map((s) => s.photoId).sort(),
-    );
+    expect(res.chosen.map((s) => s.photoId).sort()).toEqual(selected.map((s) => s.photoId).sort());
   });
 
   it('marks photos that survived but lost the top-N cut as not-selected', async () => {
     const { files, pixels } = scenario();
-    const res = await runCuration(files, { beatmap, targetCount: 4 }, stubDeps(pixels));
+    const res = await runCuration(files, { targetCount: 4 }, stubDeps(pixels));
     expect(res.scores.filter((s) => s.selected)).toHaveLength(4);
     expect(res.scores.filter((s) => s.dropReason === 'not-selected').length).toBeGreaterThanOrEqual(
       1,
@@ -101,8 +96,8 @@ describe('runCuration', () => {
 
   it('orders the reel chronologically', async () => {
     const { files, pixels } = scenario();
-    const res = await runCuration([...files].reverse(), { beatmap }, stubDeps(pixels));
-    const times = res.plan.shots.map(
+    const res = await runCuration([...files].reverse(), {}, stubDeps(pixels));
+    const times = res.chosen.map(
       (s) => must(res.scores.find((p) => p.photoId === s.photoId)).timeMs,
     );
     expect([...times].sort((a, b) => a - b)).toEqual(times);
@@ -110,7 +105,7 @@ describe('runCuration', () => {
 
   it('reports the EXIF path when photos carry a date', async () => {
     const { files, pixels } = scenario();
-    const res = await runCuration(files, { beatmap }, stubDeps(pixels));
+    const res = await runCuration(files, {}, stubDeps(pixels));
     expect(res.timeline.source).toBe('exif');
     expect(res.scores.every((s) => s.timeSource === 'exif')).toBe(true);
   });
@@ -121,7 +116,7 @@ describe('runCuration', () => {
       pixels[`p${i}.jpg`] = makeScene(20 + i);
       return exifFile(`p${i}.jpg`, null, Date.UTC(2024, 5, 1 + i));
     });
-    const res = await runCuration(files, { beatmap }, stubDeps(pixels));
+    const res = await runCuration(files, {}, stubDeps(pixels));
     expect(res.timeline).toMatchObject({
       source: 'lastModified',
       exif: 0,
@@ -136,29 +131,29 @@ describe('runCuration', () => {
       pixels[`p${i}.jpg`] = makeScene(20 + i);
       return exifFile(`p${i}.jpg`, null, 0);
     });
-    const res = await runCuration(files, { beatmap }, stubDeps(pixels));
+    const res = await runCuration(files, {}, stubDeps(pixels));
     expect(res.timeline).toMatchObject({ source: 'pickOrder', pickOrder: 4 });
-    expect(res.plan.shots.map((s) => s.photoId)).toEqual(res.scores.map((s) => s.photoId));
+    expect(res.chosen.map((s) => s.photoId)).toEqual(res.scores.map((s) => s.photoId));
   });
 
   it('survives an entirely undecodable batch', async () => {
     const files = [exifFile('a.heic', null), exifFile('b.heic', null)];
-    const res = await runCuration(files, { beatmap }, stubDeps({}));
+    const res = await runCuration(files, {}, stubDeps({}));
     expect(res.scores.every((s) => s.dropReason === 'decode-failed')).toBe(true);
-    expect(res.plan.shots).toEqual([]);
+    expect(res.chosen).toEqual([]);
   });
 
   it('survives an empty batch', async () => {
-    const res = await runCuration([], { beatmap }, stubDeps({}));
+    const res = await runCuration([], {}, stubDeps({}));
     expect(res.scores).toEqual([]);
-    expect(res.plan.shots).toEqual([]);
+    expect(res.chosen).toEqual([]);
   });
 
   it('treats an unexpected decoder crash as a decode failure, not a run failure', async () => {
     const files = [exifFile('a.jpg', null), exifFile('b.jpg', null)];
     const res = await runCuration(
       files,
-      { beatmap },
+      {},
       {
         decode: async (f) => {
           if (f.name === 'a.jpg') throw new TypeError('boom');
@@ -173,30 +168,30 @@ describe('runCuration', () => {
   it('uses caller-supplied photo ids', async () => {
     const { files, pixels } = scenario();
     const photoIds = files.map((_, i) => `id-${i}`);
-    const res = await runCuration(files, { beatmap, photoIds }, stubDeps(pixels));
+    const res = await runCuration(files, { photoIds }, stubDeps(pixels));
     expect(res.scores.map((s) => s.photoId)).toEqual(photoIds);
   });
 
   it('rejects photo ids that are not one per file, or not unique', async () => {
     const files = [exifFile('a.jpg', null), exifFile('b.jpg', null)];
-    await expect(
-      runCuration(files, { beatmap, photoIds: ['a', 'a'] }, stubDeps({})),
-    ).rejects.toThrow(/unique/);
-    await expect(runCuration(files, { beatmap, photoIds: ['a'] }, stubDeps({}))).rejects.toThrow(
+    await expect(runCuration(files, { photoIds: ['a', 'a'] }, stubDeps({}))).rejects.toThrow(
+      /unique/,
+    );
+    await expect(runCuration(files, { photoIds: ['a'] }, stubDeps({}))).rejects.toThrow(
       /one per file/,
     );
   });
 
   it('falls back to the default count for a nonsense targetCount', async () => {
     const { files, pixels } = scenario();
-    const res = await runCuration(files, { beatmap, targetCount: Number.NaN }, stubDeps(pixels));
+    const res = await runCuration(files, { targetCount: Number.NaN }, stubDeps(pixels));
     expect(res.scores.filter((s) => s.selected)).toHaveLength(6);
   });
 
   it('posts incremental progress, one step per photo, ending done', async () => {
     const { files, pixels } = scenario();
     const events: CurateProgress[] = [];
-    await runCuration(files, { beatmap, onProgress: (p) => events.push(p) }, stubDeps(pixels));
+    await runCuration(files, { onProgress: (p) => events.push(p) }, stubDeps(pixels));
     const analysing = events.filter((e) => e.stage === 'analysing');
     expect(analysing).toHaveLength(files.length);
     expect(analysing.map((e) => e.done)).toEqual(files.map((_, i) => i + 1));
@@ -208,7 +203,7 @@ describe('runCuration', () => {
     const { files, pixels } = scenario();
     const res = await runCuration(
       files,
-      { beatmap, thresholds: { duplicateHamming: -1 } },
+      { thresholds: { duplicateHamming: -1 } },
       stubDeps(pixels),
     );
     expect(res.scores.some((s) => s.dropReason === 'near-duplicate')).toBe(false);
@@ -216,7 +211,7 @@ describe('runCuration', () => {
 
   it('does not hold on to pixels: scores carry numbers and strings only', async () => {
     const { files, pixels } = scenario();
-    const res = await runCuration(files, { beatmap }, stubDeps(pixels));
+    const res = await runCuration(files, {}, stubDeps(pixels));
     expect(JSON.stringify(res).length).toBeLessThan(200_000);
   });
 });

@@ -1,6 +1,6 @@
-import type { CurateOutcome } from './pipeline';
+import type { SelectOutcome } from './pipeline';
 import type { WorkerRequest, WorkerResponse } from './protocol';
-import type { CurateOptions } from './types';
+import type { SelectOptions } from './types';
 
 /** The slice of the Worker API the client uses; lets tests stand in a fake. */
 export interface WorkerLike {
@@ -23,9 +23,9 @@ function createCurationWorker(): WorkerLike {
  */
 export function curateInWorker(
   files: File[],
-  opts: CurateOptions,
+  opts: SelectOptions,
   createWorker: () => WorkerLike = createCurationWorker,
-): Promise<CurateOutcome> {
+): Promise<SelectOutcome> {
   const { onProgress, ...workerOpts } = opts;
   return new Promise((resolve, reject) => {
     const worker = createWorker();

@@ -4,12 +4,14 @@
 // shows a "demo engine" badge whenever any of this is in use.
 import type {
   BeatMap,
-  CurateOptions,
-  CurateResult,
   Engines,
   LoadedTrack,
+  PhotoScore,
+  PlanPhoto,
   ReelPlan,
   ReelShot,
+  SelectOptions,
+  Selection,
   Track,
 } from './types';
 
@@ -63,10 +65,10 @@ function hash(s: string): number {
   return (h >>> 0) / 4294967295;
 }
 
-const REASONS = ['Looks blurry', 'Near-duplicate of another shot', 'Too dark', 'Overexposed'];
+const REASONS = ['blurry', 'near-duplicate', 'underexposed', 'overexposed'] as const;
 
-function buildPlan(order: Array<{ photoId: string }>, beatmap: BeatMap | undefined): ReelPlan {
-  const beats = beatmap?.beatsMs ?? Array.from({ length: 80 }, (_, i) => i * 500);
+function buildPlan(order: PlanPhoto[], beatmap: BeatMap): ReelPlan {
+  const beats = beatmap.beatsMs;
   // Each shot spans 4 beats; cuts land exactly on beat times.
   const stride = Math.max(2, Math.round(2200 / ((beats[1] ?? 500) - (beats[0] ?? 0))));
   const shots: ReelShot[] = order.map((p, i) => {
@@ -89,53 +91,44 @@ function buildPlan(order: Array<{ photoId: string }>, beatmap: BeatMap | undefin
     width: 1080,
     height: 1920,
     fps: 30,
-    trackId: beatmap?.trackId ?? 'chill',
+    trackId: beatmap.trackId,
     totalMs: last ? last.startMs + last.durationMs : 0,
     shots,
   };
 }
 
-async function fakeCurate(files: File[], opts: CurateOptions): Promise<CurateResult> {
-  const scored = files.map((f, fileIndex) => {
-    const r = hash(`${f.name}:${f.size}`);
-    return {
-      photoId: `fake-${fileIndex}-${f.size}`,
-      fileIndex,
-      score: Math.round(r * 100) / 100,
-      reason: undefined as string | undefined,
-    };
-  });
-  let chosen: number[];
-  if (opts.include) chosen = opts.include;
-  else {
-    const target = Math.min(opts.targetCount ?? 10, scored.length);
-    chosen = [...scored]
-      .sort((a, b) => b.score - a.score)
+async function fakeSelect(files: File[], opts: SelectOptions): Promise<Selection> {
+  const scored = files.map((f, index) => ({
+    photoId: `fake-${index}-${f.size}`,
+    index,
+    quality: Math.round(hash(`${f.name}:${f.size}`) * 100) / 100,
+  }));
+  const target = Math.min(opts.targetCount ?? 10, scored.length);
+  const kept = new Set(
+    [...scored]
+      .sort((a, b) => b.quality - a.quality)
       .slice(0, target)
-      .map((s) => s.fileIndex)
-      .sort((a, b) => a - b);
-  }
-  const scores = scored.map((s) => ({
+      .map((s) => s.index),
+  );
+  const scores: PhotoScore[] = scored.map((s) => ({
     ...s,
-    reason: chosen.includes(s.fileIndex)
-      ? undefined
-      : REASONS[Math.floor(hash(s.photoId) * REASONS.length)],
+    selected: kept.has(s.index),
+    dropReason: kept.has(s.index)
+      ? null
+      : (REASONS[Math.floor(hash(s.photoId) * REASONS.length)] ?? 'not-selected'),
+    timeMs: s.index,
+    timeSource: 'pickOrder',
   }));
   await new Promise((r) => setTimeout(r, 250));
-  return {
-    plan: buildPlan(
-      chosen.flatMap((i) => (scored[i] ? [scored[i]] : [])),
-      opts.beatmap,
-    ),
-    scores,
-  };
+  return { chosen: scores.filter((s) => s.selected).map(({ photoId }) => ({ photoId })), scores };
 }
 
 export function fakeEngines(): Engines {
   const params = new URLSearchParams(globalThis.location?.search ?? '');
   return {
     fake: true,
-    curate: fakeCurate,
+    select: fakeSelect,
+    plan: buildPlan,
     tracks: FAKE_TRACKS,
     async loadTrack(id): Promise<LoadedTrack> {
       const t = FAKE_TRACKS.find((x) => x.id === id);

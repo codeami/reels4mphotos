@@ -1,3 +1,4 @@
+import type { DropReason } from '../curation/types';
 import type { BeatMap, Rect, ReelPlan, ReelShot } from './seams/types';
 
 export const MIN_PHOTOS = 5;
@@ -32,6 +33,19 @@ export function checkCount(n: number): CountCheck {
     return { ok: false, message: `That is ${n} photos. Pick ${MAX_PHOTOS} or fewer.` };
   return { ok: true };
 }
+
+const DROP_TEXT: Record<DropReason, string> = {
+  'decode-failed': 'Could not be read',
+  blurry: 'Looks blurry',
+  underexposed: 'Too dark',
+  overexposed: 'Overexposed',
+  'near-duplicate': 'Near-duplicate of another shot',
+  'not-selected': 'Ranked lower',
+};
+
+/** Plain-language reason a photo was left out of the reel. */
+export const dropReasonText = (reason: DropReason | null): string =>
+  DROP_TEXT[reason ?? 'not-selected'];
 
 export const isHeic = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
 

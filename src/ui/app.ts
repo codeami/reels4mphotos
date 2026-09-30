@@ -62,21 +62,21 @@ export function createApp(root: HTMLElement, engines: Engines) {
     }
     store.set({ busy: 'Choosing your best shots…', skipped });
     try {
-      const result = await engines.curate(files, { targetCount: TARGET_COUNT });
+      const result = await engines.select(files, { targetCount: TARGET_COUNT });
       revokePhotoUrls(store.get());
       const photos: Photo[] = result.scores
         .flatMap((score) => {
-          const file = files[score.fileIndex];
+          const file = files[score.index];
           return file ? [{ id: score.photoId, file, url: URL.createObjectURL(file), score }] : [];
         })
-        .sort((x, y) => x.score.fileIndex - y.score.fileIndex);
-      const order = result.plan.shots.map((x) => x.photoId);
+        .sort((x, y) => x.score.index - y.score.index);
+      const order = result.chosen.map((x) => x.photoId);
       store.set({
         busy: null,
         files,
         photos,
         order,
-        plan: result.plan,
+        plan: null,
         step: 'pick',
         notice: null,
         exp: { kind: 'idle' },
@@ -132,20 +132,20 @@ export function createApp(root: HTMLElement, engines: Engines) {
     if (!s.track) return;
     store.set({ busy: 'Building preview…', notice: null });
     try {
-      const include = s.order.flatMap((id) => {
+      const chosen = s.order.flatMap((id) => {
         const photo = s.photos.find((p) => p.id === id);
-        return photo ? [photo.score.fileIndex] : [];
+        return photo ? [{ photoId: id, width: photo.score.width, height: photo.score.height }] : [];
       });
-      const result = await engines.curate(s.files, { include, beatmap: s.track.beatmap });
+      const plan = engines.plan(chosen, s.track.beatmap);
       const next = new Map<string, ImageBitmap>();
-      for (const shot of result.plan.shots) {
+      for (const shot of plan.shots) {
         const file = s.photos.find((p) => p.id === shot.photoId)?.file;
         if (file && !next.has(shot.photoId))
           next.set(shot.photoId, await createImageBitmap(file, { resizeWidth: BITMAP_WIDTH }));
       }
       closePreview();
       bitmaps = next;
-      store.set({ busy: null, plan: result.plan, step: 'preview', exp: { kind: 'idle' } });
+      store.set({ busy: null, plan, step: 'preview', exp: { kind: 'idle' } });
     } catch (err) {
       store.set({
         busy: null,
