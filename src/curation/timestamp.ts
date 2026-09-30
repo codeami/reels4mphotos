@@ -1,3 +1,4 @@
+import { must } from './must';
 import { parse } from 'exifr/dist/lite.esm.mjs';
 import type { TimeSource } from './types';
 
@@ -42,7 +43,9 @@ const isUsableFileTime = (ms: number) => Number.isFinite(ms) && ms > 0;
  * time rather than a capture time, so those photos use pick order instead.
  */
 export function resolveTimes(inputs: TimeInput[]): ResolvedTime[] {
-  const fallbackTimes = inputs.filter((i) => i.exifMs === null && isUsableFileTime(i.lastModified)).map((i) => i.lastModified);
+  const fallbackTimes = inputs
+    .filter((i) => i.exifMs === null && isUsableFileTime(i.lastModified))
+    .map((i) => i.lastModified);
   const noExif = inputs.filter((i) => i.exifMs === null).length;
   const uninformative =
     noExif > 1 &&
@@ -51,7 +54,8 @@ export function resolveTimes(inputs: TimeInput[]): ResolvedTime[] {
 
   return inputs.map((i): ResolvedTime => {
     if (i.exifMs !== null) return { timeMs: i.exifMs, source: 'exif' };
-    if (isUsableFileTime(i.lastModified) && !uninformative) return { timeMs: i.lastModified, source: 'lastModified' };
+    if (isUsableFileTime(i.lastModified) && !uninformative)
+      return { timeMs: i.lastModified, source: 'lastModified' };
     return { timeMs: i.index, source: 'pickOrder' };
   });
 }
@@ -70,15 +74,19 @@ export function normaliseTimes(times: ResolvedTime[], total: number): number[] {
     .map((t, i) => ({ i, ms: t.timeMs, stamped: t.source !== 'pickOrder' }))
     .filter((x) => x.stamped)
     .sort((a, b) => a.ms - b.ms || a.i - b.i);
-  const rank = new Map(stamped.map((x, r) => [x.i, stamped.length > 1 ? r / (stamped.length - 1) : 0]));
+  const rank = new Map(
+    stamped.map((x, r) => [x.i, stamped.length > 1 ? r / (stamped.length - 1) : 0]),
+  );
 
   return times.map((t, i) => {
     const own = rank.get(i);
     if (own !== undefined) return own;
     if (stamped.length === 0) return total > 1 ? t.timeMs / (total - 1) : 0;
-    const before = stamped.filter((x) => x.i < i).reduce((best, x) => (x.i > best ? x.i : best), -1);
-    if (before >= 0) return rank.get(before)! + (i - before) * PICK_NEIGHBOUR_STEP;
+    const before = stamped
+      .filter((x) => x.i < i)
+      .reduce((best, x) => (x.i > best ? x.i : best), -1);
+    if (before >= 0) return must(rank.get(before)) + (i - before) * PICK_NEIGHBOUR_STEP;
     const after = Math.min(...stamped.filter((x) => x.i > i).map((x) => x.i));
-    return Math.max(0, rank.get(after)! - (after - i) * PICK_NEIGHBOUR_STEP);
+    return Math.max(0, must(rank.get(after)) - (after - i) * PICK_NEIGHBOUR_STEP);
   });
 }

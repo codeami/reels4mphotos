@@ -16,11 +16,11 @@ function cellMeans(px: PixelBuffer): number[] {
     const row = Math.min(ROWS - 1, Math.floor((y * ROWS) / height));
     for (let x = 0; x < width; x++) {
       const cell = row * COLS + Math.min(COLS - 1, Math.floor((x * COLS) / width));
-      sums[cell] = sums[cell]! + luma[y * width + x]!;
-      counts[cell] = counts[cell]! + 1;
+      sums[cell] = (sums[cell] ?? 0) + (luma[y * width + x] ?? 0);
+      counts[cell] = (counts[cell] ?? 0) + 1;
     }
   }
-  return Array.from(sums, (s, i) => (counts[i]! > 0 ? s / counts[i]! : 0));
+  return Array.from(sums, (s, i) => ((counts[i] ?? 0) > 0 ? s / (counts[i] ?? 0) : 0));
 }
 
 /** 64-bit difference hash, as 16 hex digits: one bit per "is this cell darker than its right neighbour". */
@@ -31,7 +31,8 @@ export function dHash(px: PixelBuffer): string {
   let bits = 0;
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS - 1; x++) {
-      nibble = (nibble << 1) | (cells[y * COLS + x]! < cells[y * COLS + x + 1]! ? 1 : 0);
+      nibble =
+        (nibble << 1) | ((cells[y * COLS + x] ?? 0) < (cells[y * COLS + x + 1] ?? 0) ? 1 : 0);
       if (++bits === 4) {
         hex += HEX[nibble];
         nibble = 0;
@@ -46,7 +47,7 @@ export function dHash(px: PixelBuffer): string {
 export function hamming(a: string, b: string): number {
   let d = 0;
   for (let i = 0; i < a.length; i++) {
-    d += POPCOUNT[parseInt(a[i]!, 16) ^ parseInt(b[i]!, 16)]!;
+    d += POPCOUNT[parseInt(a[i] ?? '0', 16) ^ parseInt(b[i] ?? '0', 16)] ?? 0;
   }
   return d;
 }

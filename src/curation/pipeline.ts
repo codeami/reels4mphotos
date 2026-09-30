@@ -8,6 +8,7 @@ import { selectSpread } from './select';
 import { laplacianVariance, sharpnessScore } from './sharpness';
 import { normaliseTimes, readExifDate, resolveTimes } from './timestamp';
 import type { CurateOptions, CurateResult, PhotoScore, TimelineSummary } from './types';
+import { must } from './must';
 
 export interface PipelineDeps {
   decode?: (file: File, maxSize: number) => Promise<Decoded>;
@@ -49,10 +50,18 @@ function measure({ pixels, original }: Decoded): Features {
 }
 
 function summarise(scores: PhotoScore[]): TimelineSummary {
-  const count = (source: PhotoScore['timeSource']) => scores.filter((s) => s.timeSource === source).length;
-  const summary = { exif: count('exif'), lastModified: count('lastModified'), pickOrder: count('pickOrder') };
+  const count = (source: PhotoScore['timeSource']) =>
+    scores.filter((s) => s.timeSource === source).length;
+  const summary = {
+    exif: count('exif'),
+    lastModified: count('lastModified'),
+    pickOrder: count('pickOrder'),
+  };
   const used = (Object.keys(summary) as (keyof typeof summary)[]).filter((k) => summary[k] > 0);
-  return { source: used.length === 1 ? used[0]! : used.length === 0 ? 'pickOrder' : 'mixed', ...summary };
+  return {
+    source: used.length === 1 ? must(used[0]) : used.length === 0 ? 'pickOrder' : 'mixed',
+    ...summary,
+  };
 }
 
 /**
@@ -60,8 +69,14 @@ function summarise(scores: PhotoScore[]): TimelineSummary {
  * measurements are kept, so memory stays bounded and nothing derived from a
  * photo outlives this call except numbers and a 64-bit hash.
  */
-export async function runCuration(files: File[], opts: CurateOptions, deps: PipelineDeps = {}): Promise<CurateOutcome> {
-  const targetCount = Number.isFinite(opts.targetCount) ? Math.max(0, Math.floor(opts.targetCount!)) : DEFAULT_TARGET_COUNT;
+export async function runCuration(
+  files: File[],
+  opts: CurateOptions,
+  deps: PipelineDeps = {},
+): Promise<CurateOutcome> {
+  const targetCount = Number.isFinite(opts.targetCount)
+    ? Math.max(0, Math.floor(opts.targetCount ?? 0))
+    : DEFAULT_TARGET_COUNT;
   const workingSize = opts.workingSize ?? DEFAULT_WORKING_SIZE;
   const thresholds = mergeThresholds(opts.thresholds);
   const decode = deps.decode ?? ((file, size) => decodePhoto(file, size));
@@ -88,21 +103,30 @@ export async function runCuration(files: File[], opts: CurateOptions, deps: Pipe
   }
   opts.onProgress?.({ stage: 'selecting', done: files.length, total: files.length });
 
-  const times = resolveTimes(files.map((f, i) => ({ exifMs: exifMs[i]!, lastModified: f.lastModified, index: i })));
+  const times = resolveTimes(
+    files.map((f, i) => ({ exifMs: exifMs[i] ?? null, lastModified: f.lastModified, index: i })),
+  );
   const t = normaliseTimes(times, files.length);
 
   const scores: PhotoScore[] = files.map((_, i) => {
     const f = features[i];
     return {
-      photoId: ids[i]!,
+      photoId: must(ids[i]),
       index: i,
       selected: false,
       dropReason: f ? null : 'decode-failed',
       ...(f
-        ? { width: f.width, height: f.height, sharpness: f.sharpness, exposure: f.exposure, quality: f.quality, dHash: f.dHash }
+        ? {
+            width: f.width,
+            height: f.height,
+            sharpness: f.sharpness,
+            exposure: f.exposure,
+            quality: f.quality,
+            dHash: f.dHash,
+          }
         : { decodeError: decodeErrors[i] }),
-      timeMs: times[i]!.timeMs,
-      timeSource: times[i]!.source,
+      timeMs: must(times[i]).timeMs,
+      timeSource: must(times[i]).source,
     };
   });
   const byId = new Map(scores.map((s) => [s.photoId, s]));
@@ -110,37 +134,43 @@ export async function runCuration(files: File[], opts: CurateOptions, deps: Pipe
   const survivors: PhotoScore[] = [];
   for (const s of scores) {
     if (!s.dropReason) {
-      s.dropReason = classify({ sharpness: s.sharpness!, exposure: s.exposure! }, thresholds);
+      s.dropReason = classify(
+        { sharpness: must(s.sharpness), exposure: must(s.exposure) },
+        thresholds,
+      );
       if (!s.dropReason) survivors.push(s);
     }
   }
 
   const { kept, duplicateOf } = collapseDuplicates(
-    survivors.map((s) => ({ id: s.photoId, quality: s.quality!, hash: s.dHash! })),
+    survivors.map((s) => ({ id: s.photoId, quality: must(s.quality), hash: must(s.dHash) })),
     thresholds.duplicateHamming,
   );
   for (const [dropped, keeper] of duplicateOf) {
-    const s = byId.get(dropped)!;
+    const s = must(byId.get(dropped));
     s.dropReason = 'near-duplicate';
     s.duplicateOf = keeper;
   }
 
   const chosenIds = new Set(
     selectSpread(
-      kept.map((id) => ({ id, quality: byId.get(id)!.quality!, t: t[byId.get(id)!.index]! })),
+      kept.map((id) => {
+        const s = must(byId.get(id));
+        return { id, quality: must(s.quality), t: must(t[s.index]) };
+      }),
       targetCount,
       thresholds.spreadWeight,
     ),
   );
   for (const id of kept) {
-    const s = byId.get(id)!;
+    const s = must(byId.get(id));
     if (chosenIds.has(id)) s.selected = true;
     else s.dropReason = 'not-selected';
   }
 
   const chosen = scores
     .filter((s) => s.selected)
-    .sort((a, b) => t[a.index]! - t[b.index]! || a.index - b.index);
+    .sort((a, b) => must(t[a.index]) - must(t[b.index]) || a.index - b.index);
   const plan = buildPlan(
     chosen.map((s) => ({ photoId: s.photoId, width: s.width, height: s.height })),
     opts.beatmap,

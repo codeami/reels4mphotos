@@ -71,7 +71,7 @@ export function boxBlur(src: PixelBuffer, radius: number): PixelBuffer {
         let sum = 0;
         for (let k = -radius; k <= radius; k++) {
           const xx = Math.min(width - 1, Math.max(0, x + k));
-          sum += src.data[(y * width + xx) * 4 + c]!;
+          sum += src.data[(y * width + xx) * 4 + c] ?? 0;
         }
         tmp.data[(y * width + x) * 4 + c] = sum / span;
       }
@@ -84,7 +84,7 @@ export function boxBlur(src: PixelBuffer, radius: number): PixelBuffer {
         let sum = 0;
         for (let k = -radius; k <= radius; k++) {
           const yy = Math.min(height - 1, Math.max(0, y + k));
-          sum += tmp.data[(yy * width + x) * 4 + c]!;
+          sum += tmp.data[(yy * width + x) * 4 + c] ?? 0;
         }
         out.data[(y * width + x) * 4 + c] = sum / span;
       }
@@ -98,9 +98,9 @@ export function boxBlur(src: PixelBuffer, radius: number): PixelBuffer {
 export function tone(src: PixelBuffer, gain: number, offset = 0): PixelBuffer {
   const out = blank(src.width, src.height);
   for (let i = 0; i < src.data.length; i += 4) {
-    out.data[i] = src.data[i]! * gain + offset;
-    out.data[i + 1] = src.data[i + 1]! * gain + offset;
-    out.data[i + 2] = src.data[i + 2]! * gain + offset;
+    out.data[i] = (src.data[i] ?? 0) * gain + offset;
+    out.data[i + 1] = (src.data[i + 1] ?? 0) * gain + offset;
+    out.data[i + 2] = (src.data[i + 2] ?? 0) * gain + offset;
     out.data[i + 3] = 255;
   }
   return out;
@@ -118,9 +118,9 @@ export function nearDuplicate(src: PixelBuffer, seed: number, noise = 6, shift =
   const out = blank(src.width, src.height);
   for (let i = 0; i < src.data.length; i += 4) {
     const n = (rand() - 0.5) * 2 * noise;
-    out.data[i] = src.data[i]! + shift + n;
-    out.data[i + 1] = src.data[i + 1]! + shift + n;
-    out.data[i + 2] = src.data[i + 2]! + shift + n;
+    out.data[i] = (src.data[i] ?? 0) + shift + n;
+    out.data[i + 1] = (src.data[i + 1] ?? 0) + shift + n;
+    out.data[i + 2] = (src.data[i + 2] ?? 0) + shift + n;
     out.data[i + 3] = 255;
   }
   return out;
@@ -167,5 +167,8 @@ export function exifJpegBytes(dateTimeOriginal: string | null): Uint8Array {
 }
 
 export function exifFile(name: string, dateTimeOriginal: string | null, lastModified = 0): File {
-  return new File([exifJpegBytes(dateTimeOriginal).slice()], name, { type: 'image/jpeg', lastModified });
+  return new File([exifJpegBytes(dateTimeOriginal).slice()], name, {
+    type: 'image/jpeg',
+    lastModified,
+  });
 }

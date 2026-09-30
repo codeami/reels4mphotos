@@ -12,7 +12,9 @@ export interface WorkerLike {
 }
 
 function createCurationWorker(): WorkerLike {
-  return new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as WorkerLike;
+  return new Worker(new URL('./worker.ts', import.meta.url), {
+    type: 'module',
+  }) as unknown as WorkerLike;
 }
 
 /**
@@ -36,8 +38,12 @@ export function curateInWorker(
       else if (data.type === 'result') finish(() => resolve(data.result));
       else finish(() => reject(new Error(data.message)));
     };
-    worker.onerror = (event) => finish(() => reject(new Error(event.message || 'The curation worker failed.')));
-    worker.onmessageerror = () => finish(() => reject(new Error('The curation worker sent a message that could not be deserialised.')));
+    worker.onerror = (event) =>
+      finish(() => reject(new Error(event.message || 'The curation worker failed.')));
+    worker.onmessageerror = () =>
+      finish(() =>
+        reject(new Error('The curation worker sent a message that could not be deserialised.')),
+      );
     try {
       worker.postMessage({ type: 'curate', files, opts: workerOpts });
     } catch (err) {

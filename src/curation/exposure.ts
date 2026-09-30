@@ -30,15 +30,15 @@ export function analyzeExposure(px: PixelBuffer): ExposureStats {
   const histogram = new Uint32Array(256);
   let total = 0;
   for (let i = 0; i < luma.length; i++) {
-    const v = luma[i]!;
-    histogram[v] = histogram[v]! + 1;
+    const v = luma[i] ?? 0;
+    histogram[v] = (histogram[v] ?? 0) + 1;
     total += v;
   }
   const n = Math.max(1, luma.length);
   let shadows = 0;
   let highlights = 0;
-  for (let v = 0; v <= SHADOW_MAX; v++) shadows += histogram[v]!;
-  for (let v = HIGHLIGHT_MIN; v < 256; v++) highlights += histogram[v]!;
+  for (let v = 0; v <= SHADOW_MAX; v++) shadows += histogram[v] ?? 0;
+  for (let v = HIGHLIGHT_MIN; v < 256; v++) highlights += histogram[v] ?? 0;
 
   const meanLuma = total / n;
   const shadowClip = shadows / n;

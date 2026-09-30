@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { kenBurnsFor, buildPlan } from './plan';
 import { syntheticBeatMap } from './__fixtures__/beatmap';
+import { must } from './must';
 
 const chosen = (n: number, width = 4000, height = 3000) =>
   Array.from({ length: n }, (_, i) => ({ photoId: `p${i}`, width, height }));
@@ -10,7 +11,13 @@ describe('buildPlan', () => {
 
   it('fills the ReelPlan header from the shared contract', () => {
     const plan = buildPlan(chosen(10), beatmap, 20_000);
-    expect(plan).toMatchObject({ version: 1, width: 1080, height: 1920, fps: 30, trackId: beatmap.trackId });
+    expect(plan).toMatchObject({
+      version: 1,
+      width: 1080,
+      height: 1920,
+      fps: 30,
+      trackId: beatmap.trackId,
+    });
   });
 
   it('makes one contiguous shot per photo, in the order given', () => {
@@ -39,11 +46,14 @@ describe('buildPlan', () => {
     expect(beats.has(plan.totalMs)).toBe(true);
   });
 
-  it.each([60, 90, 100, 110, 128, 140])('never lands under 15 s at %i bpm, even when asked for the minimum', (bpm) => {
-    const { totalMs } = buildPlan(chosen(10), syntheticBeatMap(bpm, 60_000), 15_000);
-    expect(totalMs).toBeGreaterThanOrEqual(15_000);
-    expect(totalMs).toBeLessThanOrEqual(30_000);
-  });
+  it.each([60, 90, 100, 110, 128, 140])(
+    'never lands under 15 s at %i bpm, even when asked for the minimum',
+    (bpm) => {
+      const { totalMs } = buildPlan(chosen(10), syntheticBeatMap(bpm, 60_000), 15_000);
+      expect(totalMs).toBeGreaterThanOrEqual(15_000);
+      expect(totalMs).toBeLessThanOrEqual(30_000);
+    },
+  );
 
   it('lands the length inside the 15-30 s window', () => {
     for (const n of [5, 8, 10, 14]) {
@@ -65,7 +75,7 @@ describe('buildPlan', () => {
 
   it('opens with a cut and uses both transition styles', () => {
     const plan = buildPlan(chosen(10), beatmap, 20_000);
-    expect(plan.shots[0]!.transition).toBe('cut');
+    expect(must(plan.shots[0]).transition).toBe('cut');
     expect(new Set(plan.shots.map((s) => s.transition))).toEqual(new Set(['cut', 'crossfade']));
   });
 

@@ -1,3 +1,4 @@
+import { must } from './must';
 export interface Candidate {
   id: string;
   quality: number;
@@ -19,7 +20,7 @@ export function selectSpread(candidates: Candidate[], n: number, spreadWeight: n
   const remaining = candidates
     .map((c, order) => ({ ...c, order }))
     .sort((a, b) => b.quality - a.quality || a.order - b.order);
-  const picked = [remaining.shift()!];
+  const picked = [must(remaining.shift())];
   const evenGap = 1 / n;
 
   while (picked.length < n) {
@@ -34,7 +35,7 @@ export function selectSpread(candidates: Candidate[], n: number, spreadWeight: n
         bestAt = at;
       }
     });
-    picked.push(remaining.splice(bestAt, 1)[0]!);
+    picked.push(must(remaining.splice(bestAt, 1)[0]));
   }
   return picked.map((p) => p.id);
 }

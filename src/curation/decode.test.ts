@@ -33,7 +33,13 @@ describe('decodePhoto', () => {
   it('closes the bitmap after drawing', async () => {
     let closed = false;
     await decodePhoto(file, 512, {
-      load: async () => ({ width: 10, height: 10, close: () => { closed = true; } }),
+      load: async () => ({
+        width: 10,
+        height: 10,
+        close: () => {
+          closed = true;
+        },
+      }),
       draw: (_b, w, h) => flat(w, h, 1),
     });
     expect(closed).toBe(true);
@@ -41,7 +47,9 @@ describe('decodePhoto', () => {
 
   it('turns a browser decode failure into a DecodeError with a reason', async () => {
     const promise = decodePhoto(file, 512, {
-      load: async () => { throw new Error('The source image cannot be decoded.'); },
+      load: async () => {
+        throw new Error('The source image cannot be decoded.');
+      },
       draw: () => flat(1, 1, 0),
     });
     await expect(promise).rejects.toBeInstanceOf(DecodeError);
@@ -49,6 +57,8 @@ describe('decodePhoto', () => {
   });
 
   it('reports a missing decoder (no createImageBitmap) as a DecodeError, not a crash', async () => {
-    await expect(decodePhoto(file, 512, { load: undefined, draw: undefined })).rejects.toBeInstanceOf(DecodeError);
+    await expect(
+      decodePhoto(file, 512, { load: undefined, draw: undefined }),
+    ).rejects.toBeInstanceOf(DecodeError);
   });
 });

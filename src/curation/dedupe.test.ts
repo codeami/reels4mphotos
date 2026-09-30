@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { collapseDuplicates } from './dedupe';
+import { must } from './must';
 
 const HASH_A = '0f0f0f0f0f0f0f0f';
 const HASH_A_NEAR = '0f0f0f0f0f0f0f78'; // 4 bits away
@@ -19,7 +20,10 @@ describe('collapseDuplicates', () => {
   });
 
   it('keeps the better photo even when it is listed second', () => {
-    const { kept, duplicateOf } = collapseDuplicates([items[1]!, items[0]!, items[2]!], 10);
+    const { kept, duplicateOf } = collapseDuplicates(
+      [must(items[1]), must(items[0]), must(items[2])],
+      10,
+    );
     expect(kept).toContain('a');
     expect(kept).not.toContain('b');
     expect(duplicateOf.get('b')).toBe('a');

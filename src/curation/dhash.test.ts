@@ -21,7 +21,9 @@ describe('dHash', () => {
   });
 
   it('does not depend on the working resolution', () => {
-    expect(hamming(dHash(makeScene(1, 256, 256)), dHash(makeScene(1, 512, 512)))).toBeLessThanOrEqual(8);
+    expect(
+      hamming(dHash(makeScene(1, 256, 256)), dHash(makeScene(1, 512, 512))),
+    ).toBeLessThanOrEqual(8);
   });
 });
 

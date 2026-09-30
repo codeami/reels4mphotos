@@ -6,7 +6,7 @@ export function toLuma(px: PixelBuffer): Uint8Array {
   const out = new Uint8Array(n);
   const d = px.data;
   for (let i = 0, j = 0; i < n; i++, j += 4) {
-    out[i] = (299 * d[j]! + 587 * d[j + 1]! + 114 * d[j + 2]!) / 1000;
+    out[i] = (299 * (d[j] ?? 0) + 587 * (d[j + 1] ?? 0) + 114 * (d[j + 2] ?? 0)) / 1000;
   }
   return out;
 }

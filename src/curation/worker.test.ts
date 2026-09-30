@@ -4,9 +4,12 @@ import { exifFile, makeScene } from './__fixtures__/scenes';
 import { curateInWorker, type WorkerLike } from './client';
 import type { WorkerRequest, WorkerResponse } from './protocol';
 import { handleRequest } from './worker';
+import { must } from './must';
 
 const beatmap = syntheticBeatMap(120, 60_000);
-const deps = { decode: async () => ({ pixels: makeScene(3), original: { width: 400, height: 300 } }) };
+const deps = {
+  decode: async () => ({ pixels: makeScene(3), original: { width: 400, height: 300 } }),
+};
 
 describe('handleRequest (the worker body)', () => {
   it('posts progress messages then one result', async () => {
@@ -14,7 +17,7 @@ describe('handleRequest (the worker body)', () => {
     const files = [exifFile('a.jpg', null), exifFile('b.jpg', null)];
     await handleRequest({ type: 'curate', files, opts: { beatmap } }, (m) => out.push(m), deps);
     expect(out.filter((m) => m.type === 'progress').length).toBeGreaterThanOrEqual(2);
-    expect(out[out.length - 1]!.type).toBe('result');
+    expect(must(out[out.length - 1]).type).toBe('result');
     expect(out.filter((m) => m.type === 'result')).toHaveLength(1);
   });
 
@@ -22,7 +25,7 @@ describe('handleRequest (the worker body)', () => {
     const out: WorkerResponse[] = [];
     const bad = { type: 'curate', files: null, opts: { beatmap } } as unknown as WorkerRequest;
     await handleRequest(bad, (m) => out.push(m), deps);
-    expect(out[out.length - 1]!.type).toBe('error');
+    expect(must(out[out.length - 1]).type).toBe('error');
   });
 });
 
@@ -50,7 +53,11 @@ describe('curateInWorker', () => {
     const worker = inProcessWorker();
     const files = [exifFile('a.jpg', null), exifFile('b.jpg', null), exifFile('c.jpg', null)];
     const steps: number[] = [];
-    const res = await curateInWorker(files, { beatmap, onProgress: (p) => p.stage === 'analysing' && steps.push(p.done) }, () => worker);
+    const res = await curateInWorker(
+      files,
+      { beatmap, onProgress: (p) => p.stage === 'analysing' && steps.push(p.done) },
+      () => worker,
+    );
     expect(res.scores).toHaveLength(3);
     expect(steps).toEqual([1, 2, 3]);
     expect(worker.terminated).toBe(true);
@@ -58,8 +65,12 @@ describe('curateInWorker', () => {
 
   it('never sends a function across the worker boundary', async () => {
     const worker = inProcessWorker();
-    await curateInWorker([exifFile('a.jpg', null)], { beatmap, onProgress: () => {} }, () => worker);
-    expect(worker.received[0]!.opts).not.toHaveProperty('onProgress');
+    await curateInWorker(
+      [exifFile('a.jpg', null)],
+      { beatmap, onProgress: () => {} },
+      () => worker,
+    );
+    expect(must(worker.received[0]).opts).not.toHaveProperty('onProgress');
   });
 
   it('rejects when the worker reports an error, and still terminates it', async () => {

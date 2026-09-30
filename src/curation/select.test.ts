@@ -1,3 +1,4 @@
+import { must } from './must';
 import { describe, expect, it } from 'vitest';
 import { selectSpread } from './select';
 
@@ -16,7 +17,7 @@ describe('selectSpread', () => {
 
   it('pulls picks from the later half of the timeline instead of the raw top N', () => {
     const ids = selectSpread(candidates, 10, 0.4);
-    const late = ids.filter((id) => candidates.find((c) => c.id === id)!.t > 0.5);
+    const late = ids.filter((id) => must(candidates.find((c) => c.id === id)).t > 0.5);
     expect(ids).toHaveLength(10);
     expect(late.length).toBeGreaterThanOrEqual(3);
   });

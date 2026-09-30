@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { boxBlur, flat, makeScene } from './__fixtures__/scenes';
 import { laplacianVariance, sharpnessScore } from './sharpness';
+import { must } from './must';
 
 describe('laplacianVariance', () => {
   it('scores a blurred photo below the sharp original', () => {
@@ -27,8 +28,9 @@ describe('sharpnessScore', () => {
   it('maps variance to 0..1 and increases monotonically', () => {
     const values = [0, 10, 50, 200, 1000, 50000].map(sharpnessScore);
     expect(values[0]).toBe(0);
-    for (let i = 1; i < values.length; i++) expect(values[i]!).toBeGreaterThan(values[i - 1]!);
-    expect(values[values.length - 1]!).toBeLessThanOrEqual(1);
+    for (let i = 1; i < values.length; i++)
+      expect(must(values[i])).toBeGreaterThan(must(values[i - 1]));
+    expect(must(values[values.length - 1])).toBeLessThanOrEqual(1);
   });
 
   it('ranks a sharp scene above its blurred copy', () => {

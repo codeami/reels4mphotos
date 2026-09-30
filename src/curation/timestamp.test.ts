@@ -1,15 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import { exifFile } from './__fixtures__/scenes';
 import { normaliseTimes, readExifDate, resolveTimes } from './timestamp';
+import { must } from './must';
 
 describe('readExifDate', () => {
   it('reads DateTimeOriginal from a JPEG', async () => {
     const ms = await readExifDate(exifFile('a.jpg', '2024:06:01 12:30:15'));
     expect(ms).not.toBeNull();
     // EXIF stores no zone; whichever zone is used, the wall-clock fields must survive.
-    const d = new Date(ms!);
-    const wall = [d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()];
-    const utc = [d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()];
+    const d = new Date(must(ms));
+    const wall = [
+      d.getFullYear(),
+      d.getMonth(),
+      d.getDate(),
+      d.getHours(),
+      d.getMinutes(),
+      d.getSeconds(),
+    ];
+    const utc = [
+      d.getUTCFullYear(),
+      d.getUTCMonth(),
+      d.getUTCDate(),
+      d.getUTCHours(),
+      d.getUTCMinutes(),
+      d.getUTCSeconds(),
+    ];
     const expected = [2024, 5, 1, 12, 30, 15];
     expect([wall, utc]).toContainEqual(expected);
   });
@@ -91,7 +106,10 @@ describe('normaliseTimes', () => {
 
   it('is not flattened by one outlier timestamp', () => {
     const day = 86_400_000;
-    const t = normaliseTimes([stamped(0), stamped(day), stamped(2 * day), stamped(3 * day), stamped(900 * day)], 5);
+    const t = normaliseTimes(
+      [stamped(0), stamped(day), stamped(2 * day), stamped(3 * day), stamped(900 * day)],
+      5,
+    );
     expect(t).toEqual([0, 0.25, 0.5, 0.75, 1]);
   });
 
@@ -107,9 +125,9 @@ describe('normaliseTimes', () => {
   it('puts a pick-order photo next to the stamped photo picked just before it', () => {
     // pick order: A(t=0) B(t=1) C(no date) D(no date): C and D follow B, not jump to the ends.
     const t = normaliseTimes([stamped(10), stamped(20), picked(2), picked(3)], 4);
-    expect(t[2]!).toBeGreaterThanOrEqual(t[1]!);
-    expect(t[3]!).toBeGreaterThan(t[2]!);
-    expect(t[3]! - t[1]!).toBeLessThan(0.01);
+    expect(must(t[2])).toBeGreaterThanOrEqual(must(t[1]));
+    expect(must(t[3])).toBeGreaterThan(must(t[2]));
+    expect(must(t[3]) - must(t[1])).toBeLessThan(0.01);
   });
 
   it('puts a single photo at 0', () => {

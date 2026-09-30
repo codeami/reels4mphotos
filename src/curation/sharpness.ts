@@ -15,7 +15,12 @@ export function laplacianVariance(px: PixelBuffer): number {
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const i = y * w + x;
-      const lap = luma[i - w]! + luma[i + w]! + luma[i - 1]! + luma[i + 1]! - 4 * luma[i]!;
+      const lap =
+        (luma[i - w] ?? 0) +
+        (luma[i + w] ?? 0) +
+        (luma[i - 1] ?? 0) +
+        (luma[i + 1] ?? 0) -
+        4 * (luma[i] ?? 0);
       sum += lap;
       sumSq += lap * lap;
       count++;

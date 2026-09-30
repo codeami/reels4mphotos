@@ -19,12 +19,7 @@ export interface BeatMap {
 export type TimeSource = 'exif' | 'lastModified' | 'pickOrder';
 
 export type DropReason =
-  | 'decode-failed'
-  | 'blurry'
-  | 'underexposed'
-  | 'overexposed'
-  | 'near-duplicate'
-  | 'not-selected';
+  'decode-failed' | 'blurry' | 'underexposed' | 'overexposed' | 'near-duplicate' | 'not-selected';
 
 export type ExposureVerdict = 'ok' | 'underexposed' | 'overexposed';
 
@@ -77,7 +72,12 @@ export interface PhotoScore {
   /** Raw Laplacian variance. */
   sharpness?: number;
   /** Raw exposure stats. */
-  exposure?: { meanLuma: number; shadowClip: number; highlightClip: number; verdict: ExposureVerdict };
+  exposure?: {
+    meanLuma: number;
+    shadowClip: number;
+    highlightClip: number;
+    verdict: ExposureVerdict;
+  };
   /** 0..1 combined quality, before the spread adjustment. */
   quality?: number;
   dHash?: string;

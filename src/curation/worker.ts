@@ -21,7 +21,8 @@ export async function handleRequest(
 }
 
 // Only wire up messaging when actually running as a dedicated worker.
-const WorkerScope = (globalThis as { WorkerGlobalScope?: abstract new () => object }).WorkerGlobalScope;
+const WorkerScope = (globalThis as { WorkerGlobalScope?: abstract new () => object })
+  .WorkerGlobalScope;
 if (WorkerScope && self instanceof WorkerScope) {
   self.addEventListener('message', (event: MessageEvent<WorkerRequest>) => {
     void handleRequest(event.data, (message) => (self as unknown as Worker).postMessage(message));
