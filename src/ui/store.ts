@@ -16,7 +16,7 @@ export interface Skipped {
 export type ExportState =
   | { kind: 'idle' }
   | { kind: 'rendering'; progress: number }
-  | { kind: 'done'; file: File; silent: boolean; url: string }
+  | { kind: 'done'; file: File; silent: boolean; url: string; saved: boolean }
   | { kind: 'error'; message: string };
 
 export interface State {

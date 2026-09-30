@@ -59,8 +59,12 @@ test('core loop: pick 20, deselect one, reorder, track, preview, export, share',
   await page.getByTestId('export').click();
   await expect(page.getByRole('progressbar')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Your reel is ready' })).toBeVisible();
-  await expect(page.getByTestId('download')).toBeVisible();
+  await expect(page.getByTestId('download')).toHaveText('Save video');
   await expect(page.getByTestId('silent-hint')).toHaveCount(0);
+  await expect(page.getByTestId('saved-next')).toHaveCount(0);
+  await page.getByTestId('download').click();
+  await expect(page.getByTestId('saved-next')).toContainText('open Instagram and pick the reel from your camera roll');
+  await expect(page.getByTestId('saved-next')).not.toContainText(/post(s|ed)? to/i);
 });
 
 test('share is guarded by canShare and download is always there', async ({ page }) => {

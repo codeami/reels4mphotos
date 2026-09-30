@@ -125,13 +125,18 @@ export function createApp(root: HTMLElement, engines: Engines) {
         if (store.get().exp.kind === 'rendering') store.set({ exp: { kind: 'rendering', progress } });
       });
       const file = new File([blob], 'reel.mp4', { type: 'video/mp4' });
-      store.set({ exp: { kind: 'done', file, silent, url: URL.createObjectURL(file) }, announce: silent ? 'Export finished, without sound.' : 'Export finished.' });
+      store.set({ exp: { kind: 'done', file, silent, url: URL.createObjectURL(file), saved: false }, announce: silent ? 'Export finished, without sound.' : 'Export finished.' });
     } catch (err) {
       store.set({ exp: { kind: 'error', message: `Export failed: ${err instanceof Error ? err.message : String(err)}` } });
     }
   }
 
   const canShare = (file: File) => typeof navigator.canShare === 'function' && typeof navigator.share === 'function' && navigator.canShare({ files: [file] });
+
+  function markSaved() {
+    const e = store.get().exp;
+    if (e.kind === 'done') store.set({ exp: { ...e, saved: true }, announce: 'Saved. Open Instagram and pick it from your camera roll.' });
+  }
 
   async function share() {
     const e = store.get().exp;
@@ -188,7 +193,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
         previewFor = s.plan;
         return preview.el;
       }
-      case 'export': return exportScreen(s, { onStart: () => void startExport(), onShare: () => void share(), canShare, onRestart: () => { closePreview(); revokePhotoUrls(store.get()); store.reset(); } });
+      case 'export': return exportScreen(s, { onStart: () => void startExport(), onShare: () => void share(), onSaved: markSaved, canShare, onRestart: () => { closePreview(); revokePhotoUrls(store.get()); store.reset(); } });
       default: return addScreen(s, { onFiles: (f) => void handleFiles(f) });
     }
   }

@@ -4,6 +4,7 @@ import type { State } from '../store';
 export interface ExportActions {
   onStart: () => void;
   onShare: () => void;
+  onSaved: () => void;
   onRestart: () => void;
   canShare: (file: File) => boolean;
 }
@@ -34,9 +35,10 @@ export function exportScreen(s: State, a: ExportActions): HTMLElement {
       e.silent && h('div', { class: 'hint', role: 'status', 'data-testid': 'silent-hint' },
         h('strong', {}, 'This video has no sound. '), 'Add sound in Instagram: pick a track from its music library when you post.'),
       h('p', { class: 'lede' }, `${e.file.name} · ${(e.file.size / 1048576).toFixed(1)} MB`),
-      canShare && h('button', { class: 'btn btn-primary', type: 'button', 'data-testid': 'share', onclick: a.onShare }, 'Share'),
-      h('button', { class: `btn ${canShare ? 'btn-ghost' : 'btn-primary'}`, type: 'button', 'data-testid': 'download', onclick: () => download(e.file, e.url) }, 'Download MP4'),
-      !canShare && h('p', { class: 'lede small' }, 'Sharing files is not available here, so download and post from your gallery.'),
+      h('button', { class: 'btn btn-primary', type: 'button', 'data-testid': 'download', onclick: () => { download(e.file, e.url); a.onSaved(); } }, 'Save video'),
+      e.saved && h('div', { class: 'hint hint-ok', role: 'status', 'data-testid': 'saved-next' },
+        h('strong', {}, 'Saved. '), 'Next: open Instagram and pick the reel from your camera roll. If it landed in Files instead, use Share, then Save Video, to put it in Photos.'),
+      canShare && h('button', { class: 'btn btn-ghost', type: 'button', 'data-testid': 'share', onclick: a.onShare }, 'Share… (AirDrop, Messages)'),
       h('button', { class: 'btn btn-quiet', type: 'button', onclick: a.onRestart }, 'Make another'),
     ];
   } else {
