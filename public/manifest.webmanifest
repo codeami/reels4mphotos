@@ -1,0 +1,11 @@
+{
+  "name": "Reels4mPhotos",
+  "short_name": "Reels4mPhotos",
+  "description": "Turn photos into a 9:16 reel, entirely on your device.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

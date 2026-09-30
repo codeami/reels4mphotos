@@ -1,0 +1,30 @@
+{
+  "name": "reels4mphotos",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Turn photos into a 9:16 reel, entirely on device.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . && prettier --check . && tsc --noEmit && node tools/audit-deps.mjs",
+    "format": "prettier --write .",
+    "test": "vitest run --coverage",
+    "e2e": "playwright test",
+    "audit:deps": "node tools/audit-deps.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.3",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.9",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.3"
+  }
+}
