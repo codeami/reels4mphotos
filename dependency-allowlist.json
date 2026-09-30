@@ -5,6 +5,7 @@
     "@playwright/test",
     "@types/node",
     "@vitest/coverage-v8",
+    "audio-decode",
     "eslint",
     "eslint-config-prettier",
     "prettier",

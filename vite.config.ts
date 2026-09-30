@@ -10,7 +10,7 @@ export default defineConfig({
   build: { target: 'es2022' },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', 'tools/**/*.test.{ts,mjs}'],
+    include: ['src/**/*.test.ts', 'tools/**/*.test.{ts,mjs}', 'scripts/**/*.test.mjs'],
     coverage: { provider: 'v8', reporter: ['text', 'lcov'], include: ['src/**', 'tools/**'] },
   },
 });

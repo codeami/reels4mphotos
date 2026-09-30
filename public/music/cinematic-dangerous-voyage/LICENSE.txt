@@ -1,0 +1,19 @@
+License: CC0 1.0 Universal (Public Domain Dedication)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+Title: Dangerous Voyage
+Artist: HoliznaCC0
+Album: Background Music
+Source URL: https://freemusicarchive.org/music/holiznacc0/background-music/dangerous-voyage/
+Artist page: https://freemusicarchive.org/music/holiznacc0/
+Original file: https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/Tvb0DDm30Pc0zqEJB3UAJscCXysMFzWj5iZn81Um.mp3
+Retrieved: 2026-10-01
+
+Verification: on 2026-10-01 the track page above, for this track itself (not just
+the site or album), states: "Dangerous Voyage by HoliznaCC0 is licensed under a CC0 1.0
+Universal License", linking to the licence URL above. Free Music Archive lists the
+track under the artist HoliznaCC0 on that page.
+
+Modifications (CC0 requires none; recorded for provenance): a 45 s excerpt starting
+19.97 s into the original, 0.5 s fade-in, 2 s fade-out, loudness-normalised to
+-16 LUFS integrated, encoded as 128 kbps AAC in M4A. Made with scripts/prepare-track.sh.
