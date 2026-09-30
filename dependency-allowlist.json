@@ -1,0 +1,16 @@
+{
+  "_comment": "Direct dependencies approved for this project. Adding one needs a captain decision (AGENTS.md: no dependency that phones home). CI fails on anything not listed.",
+  "allowed": [
+    "@eslint/js",
+    "@playwright/test",
+    "@types/node",
+    "@vitest/coverage-v8",
+    "eslint",
+    "eslint-config-prettier",
+    "prettier",
+    "typescript",
+    "typescript-eslint",
+    "vite",
+    "vitest"
+  ]
+}
