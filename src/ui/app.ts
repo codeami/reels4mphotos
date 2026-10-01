@@ -27,6 +27,12 @@ export function createApp(root: HTMLElement, engines: Engines) {
   let bitmaps = new Map<string, ImageBitmap>();
   let pendingFocus: string | null = null;
 
+  // Background only: a failure is not the user's problem, the export path copes on its own.
+  // `data-warm` marks the moment load-time requests are over, for the zero-request E2E.
+  void (engines.warmUp?.() ?? Promise.resolve())
+    .catch(() => undefined)
+    .then(() => root.setAttribute('data-warm', 'done'));
+
   const say = (announce: string) => store.set({ announce });
 
   function closePreview() {

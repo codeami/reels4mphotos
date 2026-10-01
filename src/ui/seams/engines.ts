@@ -34,17 +34,53 @@ async function loadCatalogue(): Promise<CatalogueTrack[]> {
   return body.tracks;
 }
 
-async function loadRealTrack(entry: CatalogueTrack): Promise<LoadedTrack> {
+/** A track fetched in full: what the UI needs to play it and what the renderer needs to mix it. */
+interface FetchedTrack {
+  loaded: LoadedTrack;
+  bytes: ArrayBuffer;
+}
+
+async function fetchRealTrack(entry: CatalogueTrack): Promise<FetchedTrack> {
   const base = import.meta.env.BASE_URL;
-  const res = await fetch(`${base}${entry.beatmap}`);
-  if (!res.ok) throw new Error(`Beat map for "${entry.title}" is missing (${res.status}).`);
-  const beatmap = (await res.json()) as BeatMap;
+  const [beatmapRes, audioRes] = await Promise.all([
+    fetch(`${base}${entry.beatmap}`),
+    fetch(`${base}${entry.track}`),
+  ]);
+  if (!beatmapRes.ok)
+    throw new Error(`Beat map for "${entry.title}" is missing (${beatmapRes.status}).`);
+  if (!audioRes.ok) throw new Error(`Audio for "${entry.title}" is missing (${audioRes.status}).`);
+  const beatmap = (await beatmapRes.json()) as BeatMap;
+  const bytes = await audioRes.arrayBuffer();
+  // A blob: URL keeps preview and sample playback off the network once the bytes are in memory.
+  const audioUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/mp4' }));
   return {
-    id: entry.id,
-    title: entry.title,
-    mood: entry.mood,
-    audioUrl: `${base}${entry.track}`,
-    beatmap,
+    loaded: { id: entry.id, title: entry.title, mood: entry.mood, audioUrl, beatmap },
+    bytes,
+  };
+}
+
+/**
+ * Every shipped track is fetched once, at mount, so choosing a track, previewing it and exporting
+ * make no request. The files are small, same-origin and already precached by the service worker.
+ * A fetch that failed is dropped so the next use tries again and reports the error then.
+ */
+function createTrackStore(catalogue: CatalogueTrack[]) {
+  const fetched = new Map<string, Promise<FetchedTrack>>();
+  const fetchTrack = (id: string): Promise<FetchedTrack> => {
+    const entry = catalogue.find((t) => t.id === id);
+    if (!entry) return Promise.reject(new Error(`Unknown track ${id}`));
+    const hit = fetched.get(id);
+    if (hit) return hit;
+    const pending = fetchRealTrack(entry);
+    fetched.set(id, pending);
+    pending.catch(() => fetched.delete(id));
+    return pending;
+  };
+  return {
+    prefetch: () => catalogue.forEach((t) => void fetchTrack(t.id).catch(() => undefined)),
+    settled: () => Promise.allSettled(catalogue.map((t) => fetchTrack(t.id))),
+    load: async (id: string) => (await fetchTrack(id)).loaded,
+    bytes: async (id: string) => (await fetchTrack(id)).bytes,
   };
 }
 
@@ -67,10 +103,13 @@ export async function realEngines(): Promise<Partial<Engines>> {
         ph: Map<string, Blob>,
         b: BeatMap,
         cb: (n: number) => void,
+        options?: { trackBytes?: ArrayBuffer },
       ) => Promise<Blob>;
+      warmUpRenderer?: () => Promise<void>;
     };
-    out.render = async (plan, photos, beatmap, onProgress): Promise<RenderOutcome> => {
-      const blob = await mod.renderReel(plan, photos, beatmap, onProgress);
+    out.warmUp = mod.warmUpRenderer;
+    out.render = async (plan, photos, beatmap, onProgress, trackBytes): Promise<RenderOutcome> => {
+      const blob = await mod.renderReel(plan, photos, beatmap, onProgress, { trackBytes });
       // ASSUMED: the render engine flags a silent fallback on the blob itself.
       return { blob, silent: (blob as Blob & { silent?: boolean }).silent === true };
     };
@@ -85,16 +124,25 @@ export async function resolveEngines(forceFake = false): Promise<Engines> {
   const real = await realEngines();
   const usesFake = !real.select || !real.plan || !real.render;
   const catalogue = await loadCatalogue();
+  const trackStore = createTrackStore(catalogue);
+  trackStore.prefetch();
+  const warmRenderer = real.warmUp;
+  const realRender = real.render;
   return {
     select: real.select ?? fake.select,
     plan: real.plan ?? fake.plan,
-    render: real.render ?? fake.render,
+    render: realRender
+      ? async (plan, photos, beatmap, onProgress) =>
+          realRender(plan, photos, beatmap, onProgress, await trackStore.bytes(plan.trackId))
+      : fake.render,
+    // settles once the tracks are in memory and the renderer has warmed up; never rejects
+    warmUp: () =>
+      Promise.all([trackStore.settled(), warmRenderer?.()]).then(
+        () => undefined,
+        () => undefined,
+      ),
     tracks: catalogue.map(({ id, title, mood }) => ({ id, title, mood })),
-    loadTrack: async (id) => {
-      const entry = catalogue.find((t) => t.id === id);
-      if (!entry) throw new Error(`Unknown track ${id}`);
-      return loadRealTrack(entry);
-    },
+    loadTrack: trackStore.load,
     fake: usesFake,
   };
 }
