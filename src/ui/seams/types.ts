@@ -62,7 +62,11 @@ export interface Engines {
     photos: Map<string, Blob>,
     beatmap: BeatMap,
     onProgress: (p: number) => void,
+    /** The music track's bytes, when the caller holds them, so the renderer fetches nothing. */
+    trackBytes?: ArrayBuffer,
   ): Promise<RenderOutcome>;
+  /** Best-effort background preparation (worker, capability probe) so an export makes no request. */
+  warmUp?(): Promise<void>;
   tracks: Track[];
   loadTrack(id: string): Promise<LoadedTrack>;
   // true when any part is a local fake, so the UI can say so out loud
