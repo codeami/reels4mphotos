@@ -4,13 +4,14 @@ import {
   crossfadeAlpha,
   cutsOnBeat,
   dropReasonText,
+  groupLeftOut,
   isHeic,
   move,
   rectAt,
   shotIndexAt,
   toggle,
 } from './logic';
-import type { ReelPlan, ReelShot } from './seams/types';
+import type { PhotoScore, ReelPlan, ReelShot } from './seams/types';
 
 const r = { x: 0, y: 0, w: 1, h: 1 };
 const plan = (starts: number[]): ReelPlan => ({
@@ -112,5 +113,67 @@ describe('dropReasonText', () => {
     expect(texts.every((t) => t.length > 0)).toBe(true);
     expect(new Set(texts).size).toBe(reasons.length);
     expect(dropReasonText(null)).toBe(dropReasonText('not-selected'));
+  });
+});
+
+describe('groupLeftOut', () => {
+  const photo = (index: number, over: Partial<PhotoScore>) => ({
+    score: {
+      photoId: `p${index}`,
+      index,
+      selected: false,
+      dropReason: null,
+      timeMs: index,
+      timeSource: 'pickOrder',
+      ...over,
+    } satisfies PhotoScore,
+  });
+  const ids = (g: ReturnType<typeof groupLeftOut>[number]) => g.items.map((p) => p.score.photoId);
+
+  it('puts "good but no room" first, then user removals, then the quality drops', () => {
+    const groups = groupLeftOut([
+      photo(0, { dropReason: 'blurry' }),
+      photo(1, { dropReason: 'near-duplicate', duplicateOf: 'p9' }),
+      photo(2, { selected: true }),
+      photo(3, { dropReason: 'not-selected' }),
+      photo(4, { dropReason: 'decode-failed' }),
+      photo(5, { dropReason: 'overexposed' }),
+      photo(6, { dropReason: 'underexposed' }),
+    ]);
+    expect(groups.map((g) => g.kind)).toEqual([
+      'not-selected',
+      'removed',
+      'near-duplicate',
+      'blurry',
+      'underexposed',
+      'overexposed',
+      'decode-failed',
+    ]);
+  });
+
+  it('lists the best photo first within a group, and photos without a score last', () => {
+    const [group] = groupLeftOut([
+      photo(0, { dropReason: 'not-selected', quality: 0.4 }),
+      photo(1, { dropReason: 'not-selected' }),
+      photo(2, { dropReason: 'not-selected', quality: 0.9 }),
+    ]);
+    expect(group && ids(group)).toEqual(['p2', 'p0', 'p1']);
+  });
+
+  it('calls a photo the user removed "removed", not "ranked lower", and skips empty groups', () => {
+    const groups = groupLeftOut([photo(0, { selected: true })]);
+    expect(groups.map((g) => g.kind)).toEqual(['removed']);
+    expect(groupLeftOut([])).toEqual([]);
+  });
+
+  it('treats a missing drop reason on an unselected photo as no room', () => {
+    expect(groupLeftOut([photo(0, {})]).map((g) => g.kind)).toEqual(['not-selected']);
+  });
+});
+
+describe('left-out wording', () => {
+  it('never says "blurry" and shows no raw number', () => {
+    expect(dropReasonText('blurry')).not.toMatch(/blurry/i);
+    expect(dropReasonText('blurry')).not.toMatch(/\d/);
   });
 });

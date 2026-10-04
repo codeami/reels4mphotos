@@ -108,7 +108,9 @@ describe('beat maps', () => {
       } finally {
         rmSync(outDir, { recursive: true, force: true });
       }
-    });
+      // Decodes a 45 s track in a child process; the 5 s default is not enough when every test file
+      // runs at once under coverage.
+    }, 30_000);
   });
 });
 

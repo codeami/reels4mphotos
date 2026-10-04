@@ -16,6 +16,7 @@ export function previewScreen(
   bitmaps: Map<string, ImageBitmap>,
   audioUrl: string,
   beatmap: BeatMap,
+  extras: Array<Node | false> = [],
 ): PreviewHandle {
   const canvas = h('canvas', {
     class: 'reel-canvas',
@@ -31,10 +32,12 @@ export function previewScreen(
     `SHOT 01/${String(plan.shots.length).padStart(2, '0')}`,
   );
   const clock = h('span', { class: 'clock' }, `0.0s / ${formatSeconds(plan.totalMs)}`);
+  // iOS will not start audio without a tap, so the reel lands paused behind one large Play control.
+  // The same button covers the frame and pauses while playing.
   const playBtn = h(
     'button',
-    { class: 'btn btn-primary play', type: 'button', 'aria-label': 'Play preview' },
-    '▶ Play',
+    { class: 'play-overlay', type: 'button', 'aria-label': 'Play preview', 'data-testid': 'play' },
+    h('span', { class: 'play-disc', 'aria-hidden': 'true' }, '▶'),
   );
   const beatFlash = h('span', { class: 'beat-dot', 'aria-hidden': 'true' });
 
@@ -52,7 +55,7 @@ export function previewScreen(
       beatFlash.classList.add('on');
     }
     lastBeat = beat;
-    playBtn.textContent = playing ? '❚❚ Pause' : '▶ Play';
+    playBtn.classList.toggle('is-playing', playing);
     playBtn.setAttribute('aria-label', playing ? 'Pause preview' : 'Play preview');
   });
   playBtn.addEventListener('click', () => (player.isPlaying ? player.pause() : void player.play()));
@@ -86,8 +89,8 @@ export function previewScreen(
       h('div', { class: 'frame-edge', 'aria-hidden': 'true' }),
       canvas,
       h('div', { class: 'frame-hud' }, counter, beatFlash),
+      playBtn,
     ),
-    h('div', { class: 'play-row' }, playBtn),
     h(
       'div',
       { class: 'timeline' },
@@ -105,6 +108,7 @@ export function previewScreen(
       { class: 'lede small' },
       `Tick marks are beats; bright marks are cuts. ${beatmap.bpm} BPM.`,
     ),
+    ...extras,
   );
   return { el, destroy: () => player.destroy() };
 }

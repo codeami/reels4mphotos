@@ -2,19 +2,18 @@ import { h } from './dom';
 import { intake } from './intake';
 import { checkCount, MIN_PHOTOS, move, toggle } from './logic';
 import { enableDragReorder } from './reorder';
-import { addScreen } from './screens/add';
+import { addScreen, skippedChips } from './screens/add';
+import { customizeBlock } from './screens/customize';
 import { exportScreen } from './screens/export';
 import { pickScreen } from './screens/pick';
 import { previewScreen, type PreviewHandle } from './screens/preview';
 import { stopSample, trackScreen } from './screens/track';
 import type { Engines } from './seams/types';
-import { createStore, STEPS, type Photo, type State, type Step } from './store';
+import { createStore, stageOf, STEPS, type Photo, type State } from './store';
 
-const TITLES: Record<Step, string> = {
+const TITLES: Record<(typeof STEPS)[number], string> = {
   add: 'Add',
-  pick: 'Pick',
-  track: 'Track',
-  preview: 'Preview',
+  preview: 'Watch',
   export: 'Export',
 };
 const TARGET_COUNT = 10;
@@ -78,16 +77,18 @@ export function createApp(root: HTMLElement, engines: Engines) {
         .sort((x, y) => x.score.index - y.score.index);
       const order = result.chosen.map((x) => x.photoId);
       store.set({
-        busy: null,
+        busy: 'Cutting your reel…',
         files,
         photos,
         order,
         plan: null,
-        step: 'pick',
+        trackId: null,
+        track: null,
         notice: null,
         exp: { kind: 'idle' },
         announce: `${order.length} of ${photos.length} photos chosen.`,
       });
+      await openWithDefaultTrack();
     } catch (err) {
       store.set({
         busy: null,
@@ -133,6 +134,33 @@ export function createApp(root: HTMLElement, engines: Engines) {
     }
   }
 
+  /**
+   * Zero decisions: the first shipped track is the default, so a reel is ready the moment photos are
+   * chosen. Every shipped track is fetched at mount (see warmUp), so this makes no new request.
+   * If it cannot load, the Music screen opens so the user can pick another.
+   */
+  async function openWithDefaultTrack() {
+    const first = engines.tracks[0];
+    try {
+      if (!first) throw new Error('No music is available.');
+      const track = await engines.loadTrack(first.id);
+      store.set({ trackId: first.id, track });
+    } catch (err) {
+      store.set({
+        busy: null,
+        step: 'track',
+        notice: `Could not load the music: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      return;
+    }
+    await goPreview();
+  }
+
+  function setLength(lengthMs: number) {
+    store.set({ lengthMs });
+    void goPreview();
+  }
+
   async function goPreview() {
     const s = store.get();
     if (!s.track) return;
@@ -142,7 +170,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
         const photo = s.photos.find((p) => p.id === id);
         return photo ? [{ photoId: id, width: photo.score.width, height: photo.score.height }] : [];
       });
-      const plan = engines.plan(chosen, s.track.beatmap);
+      const plan = engines.plan(chosen, s.track.beatmap, s.lengthMs);
       const next = new Map<string, ImageBitmap>();
       for (const shot of plan.shots) {
         const file = s.photos.find((p) => p.id === shot.photoId)?.file;
@@ -214,7 +242,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
     }
   }
 
-  function goto(step: Step) {
+  function goto(step: State['step']) {
     stopSample();
     if (step !== 'preview') closePreview();
     store.set({ step, notice: null });
@@ -228,9 +256,10 @@ export function createApp(root: HTMLElement, engines: Engines) {
   const main = h('main', { class: 'stage', id: 'stage' });
   const nav = h('nav', { class: 'bar', 'aria-label': 'Step actions' });
   root.append(banner, main, nav, live);
-  let lastStep: Step | null = null;
+  let lastStep: State['step'] | null = null;
 
   function stepper(s: State) {
+    const stage = stageOf(s.step);
     return h(
       'ol',
       { class: 'steps', 'aria-label': 'Progress' },
@@ -238,8 +267,8 @@ export function createApp(root: HTMLElement, engines: Engines) {
         h(
           'li',
           {
-            class: `step${k === s.step ? ' is-now' : ''}${i < STEPS.indexOf(s.step) ? ' is-done' : ''}`,
-            'aria-current': k === s.step ? 'step' : null,
+            class: `step${k === stage ? ' is-now' : ''}${i < STEPS.indexOf(stage) ? ' is-done' : ''}`,
+            'aria-current': k === stage ? 'step' : null,
           },
           h('span', { class: 'step-n' }, String(i + 1).padStart(2, '0')),
           h('span', { class: 'step-t' }, TITLES[k]),
@@ -249,9 +278,9 @@ export function createApp(root: HTMLElement, engines: Engines) {
   }
 
   function navBar(s: State) {
-    const back = (to: Step) =>
-      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => goto(to) }, 'Back');
-    const next = (label: string, onclick: () => void, disabled = false) =>
+    const ghost = (label: string, to: State['step']) =>
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => goto(to) }, label);
+    const primary = (label: string, onclick: () => void, disabled = false) =>
       h(
         'button',
         { class: 'btn btn-primary', type: 'button', 'data-testid': 'next', disabled, onclick },
@@ -259,17 +288,14 @@ export function createApp(root: HTMLElement, engines: Engines) {
       );
     const busy = s.busy !== null;
     switch (s.step) {
-      case 'pick':
-        return [
-          back('add'),
-          next('Choose track', () => goto('track'), s.order.length < MIN_PHOTOS || busy),
-        ];
-      case 'track':
-        return [back('pick'), next('Preview', () => void goPreview(), !s.track || busy)];
       case 'preview':
-        return [back('track'), next('Export', () => goto('export'))];
+        return [ghost('New photos', 'add'), primary('Export', () => goto('export'), busy)];
+      case 'pick':
+        return [primary('Done', () => void goPreview(), s.order.length < MIN_PHOTOS || busy)];
+      case 'track':
+        return [primary('Done', () => void goPreview(), !s.track || busy)];
       case 'export':
-        return s.exp.kind === 'rendering' ? [] : [back('preview')];
+        return s.exp.kind === 'rendering' ? [] : [ghost('Back', 'preview')];
       default:
         return [];
     }
@@ -278,7 +304,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
   function screenFor(s: State): HTMLElement {
     switch (s.step) {
       case 'pick':
-        return pickScreen(s, { onToggle, onMove, onBack: () => goto('add') });
+        return pickScreen(s, { onToggle, onMove });
       case 'track':
         return trackScreen(s, engines.tracks, {
           onChoose: (id) => void chooseTrack(id),
@@ -286,7 +312,10 @@ export function createApp(root: HTMLElement, engines: Engines) {
         });
       case 'preview': {
         if (!s.plan || !s.track) return h('section', { class: 'screen' });
-        preview = previewScreen(s.plan, bitmaps, s.track.audioUrl, s.track.beatmap);
+        preview = previewScreen(s.plan, bitmaps, s.track.audioUrl, s.track.beatmap, [
+          customizeBlock(s, { onCustomize: goto, onLength: setLength }),
+          s.skipped.length > 0 && skippedChips(s.skipped),
+        ]);
         previewFor = s.plan;
         return preview.el;
       }

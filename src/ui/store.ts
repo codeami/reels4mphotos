@@ -1,7 +1,12 @@
+import { DEFAULT_LENGTH_MS } from './logic';
 import type { Engines, LoadedTrack, PhotoScore, ReelPlan } from './seams/types';
 
-export type Step = 'add' | 'pick' | 'track' | 'preview' | 'export';
-export const STEPS: Step[] = ['add', 'pick', 'track', 'preview', 'export'];
+// `pick` and `track` are the Customize screens (Photos, Music), reached from the preview.
+export type Step = 'add' | 'preview' | 'pick' | 'track' | 'export';
+/** The stepper shows three stages; the Customize screens count as the preview stage. */
+export const STEPS = ['add', 'preview', 'export'] as const;
+export const stageOf = (step: Step): (typeof STEPS)[number] =>
+  step === 'pick' || step === 'track' ? 'preview' : step;
 
 export interface Photo {
   id: string; // photoId from curation
@@ -30,6 +35,7 @@ export interface State {
   plan: ReelPlan | null;
   trackId: string | null;
   track: LoadedTrack | null;
+  lengthMs: number; // target reel length; the plan clamps it to what the track can carry
   exp: ExportState;
   announce: string; // aria-live text
 }
@@ -45,6 +51,7 @@ export const initialState = (): State => ({
   plan: null,
   trackId: null,
   track: null,
+  lengthMs: DEFAULT_LENGTH_MS,
   exp: { kind: 'idle' },
   announce: '',
 });

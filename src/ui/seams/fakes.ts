@@ -65,12 +65,19 @@ function hash(s: string): number {
   return (h >>> 0) / 4294967295;
 }
 
-const REASONS = ['blurry', 'near-duplicate', 'underexposed', 'overexposed'] as const;
+const REASONS = [
+  'not-selected',
+  'near-duplicate',
+  'blurry',
+  'underexposed',
+  'overexposed',
+] as const;
 
-function buildPlan(order: PlanPhoto[], beatmap: BeatMap): ReelPlan {
+function buildPlan(order: PlanPhoto[], beatmap: BeatMap, targetMs = 20_000): ReelPlan {
   const beats = beatmap.beatsMs;
-  // Each shot spans 4 beats; cuts land exactly on beat times.
-  const stride = Math.max(2, Math.round(2200 / ((beats[1] ?? 500) - (beats[0] ?? 0))));
+  // Cuts land exactly on beat times; a longer target spaces them wider.
+  const shotMs = Math.max(500, targetMs / Math.max(1, order.length));
+  const stride = Math.max(2, Math.round(shotMs / ((beats[1] ?? 500) - (beats[0] ?? 0))));
   const shots: ReelShot[] = order.map((p, i) => {
     const startMs = beats[Math.min(i * stride, beats.length - 1)] ?? 0;
     const endMs = beats[Math.min((i + 1) * stride, beats.length - 1)] ?? startMs;
@@ -104,21 +111,24 @@ async function fakeSelect(files: File[], opts: SelectOptions): Promise<Selection
     quality: Math.round(hash(`${f.name}:${f.size}`) * 100) / 100,
   }));
   const target = Math.min(opts.targetCount ?? 10, scored.length);
-  const kept = new Set(
-    [...scored]
-      .sort((a, b) => b.quality - a.quality)
-      .slice(0, target)
-      .map((s) => s.index),
+  const ranked = [...scored].sort((a, b) => b.quality - a.quality);
+  const kept = new Set(ranked.slice(0, target).map((s) => s.index));
+  // Every reason shows up in turn, so the UI can be exercised without a lucky draw.
+  const dropped = new Map(
+    ranked.slice(target).map((s, i) => [s.index, REASONS[i % REASONS.length] ?? 'not-selected']),
   );
-  const scores: PhotoScore[] = scored.map((s) => ({
-    ...s,
-    selected: kept.has(s.index),
-    dropReason: kept.has(s.index)
-      ? null
-      : (REASONS[Math.floor(hash(s.photoId) * REASONS.length)] ?? 'not-selected'),
-    timeMs: s.index,
-    timeSource: 'pickOrder',
-  }));
+  const winner = ranked[0]?.photoId;
+  const scores: PhotoScore[] = scored.map((s) => {
+    const dropReason = dropped.get(s.index) ?? null;
+    return {
+      ...s,
+      selected: kept.has(s.index),
+      dropReason,
+      ...(dropReason === 'near-duplicate' && winner ? { duplicateOf: winner } : {}),
+      timeMs: s.index,
+      timeSource: 'pickOrder',
+    };
+  });
   await new Promise((r) => setTimeout(r, 250));
   return { chosen: scores.filter((s) => s.selected).map(({ photoId }) => ({ photoId })), scores };
 }

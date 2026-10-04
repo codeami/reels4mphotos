@@ -1,5 +1,5 @@
 import type { DropReason } from '../curation/types';
-import type { BeatMap, Rect, ReelPlan, ReelShot } from './seams/types';
+import type { BeatMap, PhotoScore, Rect, ReelPlan, ReelShot } from './seams/types';
 
 export const MIN_PHOTOS = 5;
 export const MAX_PHOTOS = 50;
@@ -36,16 +36,67 @@ export function checkCount(n: number): CountCheck {
 
 const DROP_TEXT: Record<DropReason, string> = {
   'decode-failed': 'Could not be read',
-  blurry: 'Looks blurry',
-  underexposed: 'Too dark',
-  overexposed: 'Overexposed',
-  'near-duplicate': 'Near-duplicate of another shot',
-  'not-selected': 'Ranked lower',
+  blurry: 'Might be a little soft',
+  underexposed: 'On the dark side',
+  overexposed: 'On the bright side',
+  'near-duplicate': 'Similar to a photo in your reel',
+  'not-selected': 'Good, but no room',
 };
 
 /** Plain-language reason a photo was left out of the reel. */
 export const dropReasonText = (reason: DropReason | null): string =>
   DROP_TEXT[reason ?? 'not-selected'];
+
+/** A left-out photo was either dropped by curation or taken out by the user. */
+export type LeftOutKind = DropReason | 'removed';
+
+// Photos the user might actually want back come first.
+const LEFT_OUT_ORDER: LeftOutKind[] = [
+  'not-selected',
+  'removed',
+  'near-duplicate',
+  'blurry',
+  'underexposed',
+  'overexposed',
+  'decode-failed',
+];
+
+export interface LeftOutGroup<T> {
+  kind: LeftOutKind;
+  items: T[];
+}
+
+const qualityOf = (p: { score: PhotoScore }) => p.score.quality ?? -1;
+
+/**
+ * Groups left-out photos by why they are out, "good but no room" first, best photo first within a
+ * group. A photo curation chose but the user removed is `removed`, not "ranked lower".
+ */
+export function groupLeftOut<T extends { score: PhotoScore }>(
+  out: readonly T[],
+): LeftOutGroup<T>[] {
+  const kindOf = (p: T): LeftOutKind =>
+    p.score.selected ? 'removed' : (p.score.dropReason ?? 'not-selected');
+  return LEFT_OUT_ORDER.flatMap((kind) => {
+    const items = out
+      .filter((p) => kindOf(p) === kind)
+      .sort((a, b) => qualityOf(b) - qualityOf(a) || a.score.index - b.score.index);
+    return items.length > 0 ? [{ kind, items }] : [];
+  });
+}
+
+export interface LengthOption {
+  id: 'short' | 'standard' | 'long';
+  label: string;
+  ms: number;
+}
+// Mirror MIN / DEFAULT / MAX_REEL_MS in src/curation/plan.ts, which clamps whatever is asked for.
+export const LENGTHS: readonly LengthOption[] = [
+  { id: 'short', label: 'Short', ms: 15_000 },
+  { id: 'standard', label: 'Standard', ms: 20_000 },
+  { id: 'long', label: 'Long', ms: 30_000 },
+];
+export const DEFAULT_LENGTH_MS = 20_000;
 
 export const isHeic = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
 
