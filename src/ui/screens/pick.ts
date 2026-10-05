@@ -1,17 +1,105 @@
 import { h } from '../dom';
-import { dropReasonText, MIN_PHOTOS } from '../logic';
+import {
+  dropReasonText,
+  groupLeftOut,
+  MIN_PHOTOS,
+  type LeftOutGroup,
+  type LeftOutKind,
+} from '../logic';
 import type { Photo, State } from '../store';
 
 export interface PickActions {
   onToggle: (id: string) => void;
   onMove: (from: number, to: number) => void;
-  onBack: () => void;
 }
 
-const pct = (n: number) => `${Math.round(n * 100)}`;
+const REMOVED_TEXT = 'Taken out by you';
+
+// One line of help per group: what the reason means and what a tap does.
+const GROUP_HELP: Record<LeftOutKind, string> = {
+  'not-selected': 'Next best after the ones in your reel. Tap one to put it back.',
+  removed: 'You took these out. Tap one to put it back.',
+  'near-duplicate': 'Each is next to the photo it lost to. Tap one to keep it too.',
+  blurry: 'Soft or moving, though a little blur can be the look. Tap to keep one anyway.',
+  underexposed: 'Tap to keep one anyway.',
+  overexposed: 'Tap to keep one anyway.',
+  'decode-failed': 'These could not be opened.',
+};
+const groupTitle = (kind: LeftOutKind) =>
+  kind === 'removed' ? REMOVED_TEXT : dropReasonText(kind);
 
 function thumb(p: Photo) {
   return h('img', { src: p.url, alt: '', draggable: 'false', loading: 'lazy', decoding: 'async' });
+}
+
+/** A left-out photo; tapping it puts it back in the reel. */
+function outTile(p: Photo, why: string, a: PickActions) {
+  return h(
+    'li',
+    { class: 'tile tile-out' },
+    h(
+      'button',
+      {
+        class: 'tile-img tile-add',
+        type: 'button',
+        'aria-label': `Add back ${p.file.name}. Left out because: ${why}`,
+        onclick: () => a.onToggle(p.id),
+      },
+      thumb(p),
+      h('span', { class: 'tile-plus', 'aria-hidden': 'true' }, '+'),
+    ),
+  );
+}
+
+/** Near-duplicates, clustered under the kept photo they lost to so the call can be judged by eye. */
+function duplicatePairs(
+  group: LeftOutGroup<Photo>,
+  byId: Map<string, Photo>,
+  inReel: Set<string>,
+  a: PickActions,
+) {
+  const clusters = new Map<string, Photo[]>();
+  for (const p of group.items) {
+    const key = p.score.duplicateOf ?? '';
+    clusters.set(key, [...(clusters.get(key) ?? []), p]);
+  }
+  return [...clusters].map(([winnerId, dupes]) => {
+    const winner = byId.get(winnerId);
+    return h(
+      'li',
+      { class: 'pair', 'data-testid': 'duplicate-pair' },
+      winner &&
+        h(
+          'figure',
+          { class: 'pair-winner' },
+          h('div', { class: 'tile-img' }, thumb(winner)),
+          h('figcaption', {}, inReel.has(winnerId) ? 'In your reel' : 'Not in your reel'),
+        ),
+      h(
+        'ul',
+        { class: 'pair-lost' },
+        ...dupes.map((p) => outTile(p, dropReasonText('near-duplicate'), a)),
+      ),
+    );
+  });
+}
+
+function leftOutGroup(
+  group: LeftOutGroup<Photo>,
+  byId: Map<string, Photo>,
+  inReel: Set<string>,
+  a: PickActions,
+) {
+  const title = groupTitle(group.kind);
+  return h(
+    'section',
+    { class: 'leftout-group', 'data-reason': group.kind, 'aria-label': title },
+    h('h4', { class: 'leftout-title' }, `${title} · ${group.items.length}`),
+    h('p', { class: 'lede small' }, GROUP_HELP[group.kind]),
+    group.kind === 'near-duplicate'
+      ? h('ul', { class: 'pairs' }, ...duplicatePairs(group, byId, inReel, a))
+      : h('ul', { class: 'grid grid-out' }, ...group.items.map((p) => outTile(p, title, a))),
+  );
 }
 
 export function pickScreen(s: State, a: PickActions): HTMLElement {
@@ -118,31 +206,7 @@ export function pickScreen(s: State, a: PickActions): HTMLElement {
         'div',
         { class: 'leftout' },
         h('h3', {}, `Left out · ${out.length}`),
-        h('p', { class: 'lede small' }, 'Tap a photo to put it back in.'),
-        h(
-          'ul',
-          { class: 'grid grid-out' },
-          ...out.map((p) =>
-            h(
-              'li',
-              { class: 'tile tile-out' },
-              h(
-                'button',
-                {
-                  class: 'tile-img tile-add',
-                  type: 'button',
-                  'aria-label': `Add back ${p.file.name}. Left out because: ${dropReasonText(p.score.dropReason)}`,
-                  onclick: () => a.onToggle(p.id),
-                },
-                thumb(p),
-                h('span', { class: 'tile-plus', 'aria-hidden': 'true' }, '+'),
-              ),
-              h('p', { class: 'why' }, dropReasonText(p.score.dropReason)),
-              p.score.quality !== undefined &&
-                h('p', { class: 'score' }, `score ${pct(p.score.quality)}`),
-            ),
-          ),
-        ),
+        ...groupLeftOut(out).map((g) => leftOutGroup(g, byId, new Set(s.order), a)),
       ),
   );
 }

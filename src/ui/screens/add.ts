@@ -1,9 +1,25 @@
 import { h } from '../dom';
 import { MAX_PHOTOS, MIN_PHOTOS } from '../logic';
-import type { State } from '../store';
+import type { Skipped, State } from '../store';
 
 export interface AddActions {
   onFiles: (files: File[]) => void;
+}
+
+/** Files that could not be used, each with why: a skipped file is reported, never dropped silently. */
+export function skippedChips(skipped: Skipped[]): HTMLElement {
+  return h(
+    'ul',
+    { class: 'chips', 'aria-label': 'Skipped files' },
+    ...skipped.map((k) =>
+      h(
+        'li',
+        { class: 'chip chip-warn' },
+        h('span', { class: 'chip-reason' }, k.reason),
+        h('span', { class: 'chip-name' }, k.name),
+      ),
+    ),
+  );
 }
 
 export function addScreen(s: State, a: AddActions): HTMLElement {
@@ -43,18 +59,6 @@ export function addScreen(s: State, a: AddActions): HTMLElement {
     ),
     input,
     s.notice && h('p', { class: 'notice', role: 'alert' }, s.notice),
-    s.skipped.length > 0 &&
-      h(
-        'ul',
-        { class: 'chips', 'aria-label': 'Skipped files' },
-        ...s.skipped.map((k) =>
-          h(
-            'li',
-            { class: 'chip chip-warn' },
-            h('span', { class: 'chip-reason' }, k.reason),
-            h('span', { class: 'chip-name' }, k.name),
-          ),
-        ),
-      ),
+    s.skipped.length > 0 && skippedChips(s.skipped),
   );
 }

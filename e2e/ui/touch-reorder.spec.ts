@@ -10,6 +10,7 @@ test('dragging a tile handle by touch reorders the reel', async ({ page, browser
   test.skip(browserName !== 'chromium', 'CDP touch dispatch is Chromium-only');
   await page.goto('./?fakes=1');
   await page.setInputFiles('#photo-input', await makePhotos(page, 12));
+  await page.getByTestId('customize-photos').click();
   await expect(page.getByRole('heading', { name: '10 in your reel' })).toBeVisible();
   const before = await reelIds(page);
 

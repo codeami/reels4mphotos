@@ -154,7 +154,7 @@ test('exports a 1080x1920, 30 fps, 15-30 s MP4 with audio', async ({ page }, tes
 // The gate as a user meets it: real UI, real curation, real bundled track, real render engine. Photos
 // go in through the file input, the export is downloaded through the Save button, and the file that
 // lands on disk is read back in JS.
-test('through the real UI: pick photos, choose a track, export, and read the downloaded MP4', async ({
+test('through the real UI: pick photos, customise the track, export, and read the downloaded MP4', async ({
   page,
   context,
 }, testInfo) => {
@@ -166,12 +166,13 @@ test('through the real UI: pick photos, choose a track, export, and read the dow
   await page.waitForLoadState('networkidle');
 
   await page.setInputFiles('#photo-input', await makeScenePhotos(page, 12));
-  await expect(page.getByRole('heading', { name: /\d+ in your reel/ })).toBeVisible();
-  await page.getByTestId('next').click();
+  await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
+  // The reel is already planned on the default track; this run customises it to the gate track.
+  await page.getByTestId('customize-music').click();
   await page.getByText(track.title, { exact: true }).click();
   await expect(page.getByTestId('next')).toBeEnabled();
   await page.getByTestId('next').click();
-  await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
+  await expect(page.getByTestId('customize-music')).toContainText(track.title);
   const cutsOnBeat = await page.getByTestId('beat-sync').textContent();
   await page.getByTestId('next').click();
 

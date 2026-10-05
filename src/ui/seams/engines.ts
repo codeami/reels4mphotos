@@ -90,7 +90,7 @@ export async function realEngines(): Promise<Partial<Engines>> {
   if (curateLoader) {
     const mod = (await curateLoader()) as {
       selectPhotos: (f: File[], o: SelectOptions) => Promise<Selection>;
-      planReel: (p: PlanPhoto[], b: BeatMap) => ReelPlan;
+      planReel: (p: PlanPhoto[], b: BeatMap, targetMs?: number) => ReelPlan;
     };
     out.select = mod.selectPhotos;
     out.plan = mod.planReel;

@@ -19,7 +19,7 @@ const catalogue = (
   JSON.parse(readFileSync('public/music/index.json', 'utf8')) as { tracks: CatalogueEntry[] }
 ).tracks;
 
-test('real curation and real tracks: add photos, see the selection, pick a track, reach preview', async ({
+test('real curation and real tracks: add photos and a reel is playable with no decisions, then customise', async ({
   page,
 }) => {
   const failed: string[] = [];
@@ -28,24 +28,59 @@ test('real curation and real tracks: add photos, see the selection, pick a track
   });
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
+  // iOS refuses audio that is not started by a tap, so the app must not try: count play() calls.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __playCalls: number };
+    w.__playCalls = 0;
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      w.__playCalls += 1;
+      return play.call(this);
+    };
+  });
+  const playCalls = () =>
+    page.evaluate(() => (window as unknown as { __playCalls: number }).__playCalls);
 
   await page.goto('./');
   await page.setInputFiles('#photo-input', await makeScenePhotos(page, 12));
 
-  // Selection: no "Could not choose photos" notice, and the tiles carry the real engine's ids.
-  await expect(page.getByRole('heading', { name: /\d+ in your reel/ })).toBeVisible();
+  // Zero decisions: photos in, and the next thing on screen is a reel, already cut to the default
+  // track, waiting behind a large Play. No track was chosen, nothing was tapped, no alert.
+  await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
+  const [first] = catalogue;
+  if (!first) throw new Error('public/music/index.json lists no tracks');
+  await expect(page.getByTestId('customize-music')).toContainText(first.title);
+  await expect(page.getByTestId('beat-sync')).toHaveText(/(\d+)\/\1 cuts on beat/);
+  await expect(page.getByRole('button', { name: 'Play preview' })).toBeVisible();
+  await expect(page.locator('.clock')).toContainText('0.0s /');
+  expect(await playCalls()).toBe(0);
+
+  // A tap on Play starts it: audio is requested, and the clock moves.
+  await page.getByTestId('play').click();
+  await expect(page.getByRole('button', { name: 'Pause preview' })).toBeVisible();
+  await expect.poll(playCalls).toBeGreaterThan(0);
+  await expect(page.locator('.clock')).not.toContainText('0.0s /');
+  await page.getByTestId('play').click();
+  await expect(page.getByRole('button', { name: 'Play preview' })).toBeVisible();
+
+  // Photos (Customize): the selection carries the real engine's ids, and every group says why.
+  await page.getByTestId('customize-photos').click();
+  await expect(page.getByRole('heading', { name: /^\d+ in your reel$/ })).toBeVisible();
   const ids = await page
     .locator('[data-reel-list] [data-tile]')
     .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.id ?? ''));
   expect(ids.length).toBeGreaterThanOrEqual(5);
   expect(ids.length).toBeLessThanOrEqual(10);
   expect(ids.every((id) => /^photo-\d+$/.test(id))).toBe(true);
-  for (const why of await page.locator('.leftout .why').allTextContents())
+  for (const why of await page.locator('.leftout-title').allTextContents())
     expect(why.trim()).not.toBe('');
-
-  // Track list: exactly what public/music/index.json ships, in that order.
+  expect((await page.locator('.leftout').allTextContents()).join(' ')).not.toMatch(/score/i);
   await page.getByTestId('next').click();
+  await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
+
+  // Music (Customize): exactly what public/music/index.json ships, in that order, one tap away.
+  await page.getByTestId('customize-music').click();
   await expect(page.getByRole('heading', { name: 'Pick the beat' })).toBeVisible();
   const offered = await page.locator('.track').evaluateAll((els) =>
     els.map((e) => ({
@@ -67,9 +102,10 @@ test('real curation and real tracks: add photos, see the selection, pick a track
   for (const entry of catalogue)
     expect(fetched).toContain(new URL(entry.beatmap, page.url()).pathname);
 
-  // Preview is planned from the last track chosen, on its real beats.
+  // The preview is re-planned from the last track chosen, on its real beats.
   await page.getByTestId('next').click();
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
+  await expect(page.getByTestId('customize-music')).toContainText(catalogue.at(-1)?.title ?? '');
   await expect(page.getByTestId('beat-sync')).toHaveText(/(\d+)\/\1 cuts on beat/);
 
   expect(failed).toEqual([]);
@@ -102,12 +138,17 @@ test('a full run to a finished export makes no network request after page load',
   });
 
   await page.setInputFiles('#photo-input', await makeScenePhotos(page, 12));
-  await expect(page.getByRole('heading', { name: /\d+ in your reel/ })).toBeVisible();
-  await page.getByTestId('next').click();
-  await page.getByText(catalogue[0]?.title ?? '', { exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
+  // Play, then customise the music and the length: all of it must stay off the network.
+  await page.getByTestId('play').click();
+  await expect(page.getByRole('button', { name: 'Pause preview' })).toBeVisible();
+  await page.getByTestId('customize-music').click();
+  await page.getByText(catalogue[1]?.title ?? '', { exact: true }).click();
   await expect(page.getByTestId('next')).toBeEnabled();
   await page.getByTestId('next').click();
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
+  await page.getByText('Short', { exact: true }).click();
+  await expect(page.getByRole('radio', { name: /Short/ })).toBeChecked();
   await page.getByTestId('next').click();
   await page.getByTestId('export').click();
   await expect(page.getByRole('heading', { name: 'Your reel is ready' })).toBeVisible({
