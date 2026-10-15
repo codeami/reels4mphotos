@@ -1,4 +1,5 @@
 import { DEFAULT_LENGTH_MS } from './logic';
+import { initialRating, type RatingState } from './rating';
 import type { Engines, LoadedTrack, PhotoScore, ReelPlan } from './seams/types';
 
 // `pick` and `track` are the Customize screens (Photos, Music), reached from the preview.
@@ -22,7 +23,8 @@ export type ExportState =
   | { kind: 'idle' }
   | { kind: 'rendering'; progress: number }
   | { kind: 'done'; file: File; silent: boolean; url: string; saved: boolean }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string }
+  | { kind: 'cleared' };
 
 export interface State {
   step: Step;
@@ -37,6 +39,8 @@ export interface State {
   track: LoadedTrack | null;
   lengthMs: number; // target reel length; the plan clamps it to what the track can carry
   exp: ExportState;
+  rating: RatingState;
+  confirmClear: boolean; // the "clear app copies" question is open
   announce: string; // aria-live text
 }
 
@@ -53,6 +57,8 @@ export const initialState = (): State => ({
   track: null,
   lengthMs: DEFAULT_LENGTH_MS,
   exp: { kind: 'idle' },
+  rating: initialRating(),
+  confirmClear: false,
   announce: '',
 });
 

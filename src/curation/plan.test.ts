@@ -9,6 +9,15 @@ const chosen = (n: number, width = 4000, height = 3000) =>
 describe('buildPlan', () => {
   const beatmap = syntheticBeatMap(120, 60_000); // a beat every 500 ms
 
+  it('moves which shots crossfade when given a transition offset', () => {
+    const kinds = (offset?: number) =>
+      buildPlan(chosen(10), beatmap, 20_000, offset).shots.map((s) => s.transition);
+    expect(kinds()).toEqual(kinds(0));
+    expect(kinds(1)).not.toEqual(kinds(0));
+    expect(kinds(2)).not.toEqual(kinds(1));
+    expect(kinds(1).filter((t) => t === 'crossfade').length).toBeGreaterThan(0);
+  });
+
   it('fills the ReelPlan header from the shared contract', () => {
     const plan = buildPlan(chosen(10), beatmap, 20_000);
     expect(plan).toMatchObject({

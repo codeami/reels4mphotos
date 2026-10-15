@@ -99,11 +99,14 @@ function shotEnds(
  * Chosen photos (already in reel order) plus a beat map become a ReelPlan.
  * Shots start and end on beats (when the map has enough), the total lands inside
  * 15-30 s (or the track length, if shorter), and every shot gets a Ken Burns move.
+ * `transitionOffset` moves which shots crossfade (every third, starting later by the offset),
+ * so a retried reel can differ in more than photo order.
  */
 export function buildPlan(
   chosen: PlanPhoto[],
   beatmap: BeatMap,
   targetDurationMs: number = DEFAULT_REEL_MS,
+  transitionOffset = 0,
 ): ReelPlan {
   const header = {
     version: 1,
@@ -127,7 +130,7 @@ export function buildPlan(
   const shots: ReelShot[] = chosen.map((photo, i) => {
     const startMs = i === 0 ? 0 : must(ends[i - 1]);
     const transition: Transition =
-      i % CROSSFADE_EVERY === CROSSFADE_EVERY - 1 ? 'crossfade' : 'cut';
+      (i + transitionOffset) % CROSSFADE_EVERY === CROSSFADE_EVERY - 1 ? 'crossfade' : 'cut';
     return {
       photoId: photo.photoId,
       startMs,

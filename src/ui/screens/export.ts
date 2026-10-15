@@ -6,6 +6,9 @@ export interface ExportActions {
   onShare: () => void;
   onSaved: () => void;
   onRestart: () => void;
+  onAskClear: () => void;
+  onCancelClear: () => void;
+  onClear: () => void;
   canShare: (file: File) => boolean;
 }
 
@@ -16,6 +19,72 @@ function download(file: File, url: string) {
   a.remove();
 }
 
+function clearOffer(a: ExportActions) {
+  return h(
+    'section',
+    { class: 'clear-offer' },
+    h('p', { class: 'lede small' }, 'Finished? You can clear what this app holds.'),
+    h(
+      'button',
+      { class: 'btn btn-ghost', type: 'button', 'data-testid': 'clear', onclick: a.onAskClear },
+      'Clear app copies',
+    ),
+  );
+}
+
+/** Says exactly what goes and what stays. A web app cannot delete anything in Photos. */
+function clearConfirm(a: ExportActions) {
+  return h(
+    'section',
+    {
+      class: 'clear-confirm',
+      role: 'alertdialog',
+      'aria-labelledby': 'h-clear',
+      'data-testid': 'clear-confirm',
+    },
+    h('h3', { id: 'h-clear', tabindex: '-1' }, 'Clear the copies this app holds?'),
+    h('p', {}, 'This removes these from this app, on this phone:'),
+    h(
+      'ul',
+      { class: 'clear-list' },
+      h('li', {}, 'The photos you added.'),
+      h('li', {}, 'The preview frames.'),
+      h('li', {}, 'The reel plan.'),
+      h('li', {}, 'The exported reel video. Save it first.'),
+    ),
+    h(
+      'p',
+      { class: 'clear-keeps' },
+      h('strong', {}, 'Not deleted: '),
+      'your original photos in your Photos library. A web app cannot delete them. To delete them, open Photos and delete them yourself.',
+    ),
+    h(
+      'div',
+      { class: 'clear-actions' },
+      h(
+        'button',
+        {
+          class: 'btn btn-primary',
+          type: 'button',
+          'data-testid': 'clear-confirm-yes',
+          onclick: a.onClear,
+        },
+        'Clear app copies',
+      ),
+      h(
+        'button',
+        {
+          class: 'btn btn-ghost',
+          type: 'button',
+          'data-testid': 'clear-keep',
+          onclick: a.onCancelClear,
+        },
+        'Keep',
+      ),
+    ),
+  );
+}
+
 export function exportScreen(s: State, a: ExportActions): HTMLElement {
   const e = s.exp;
   const head = [
@@ -23,7 +92,11 @@ export function exportScreen(s: State, a: ExportActions): HTMLElement {
     h(
       'h2',
       { id: 'h-export', tabindex: '-1' },
-      e.kind === 'done' ? 'Your reel is ready' : 'Export your reel',
+      e.kind === 'done'
+        ? 'Your reel is ready'
+        : e.kind === 'cleared'
+          ? 'App copies cleared'
+          : 'Export your reel',
     ),
   ];
   let body: Array<Node | false>;
@@ -84,6 +157,25 @@ export function exportScreen(s: State, a: ExportActions): HTMLElement {
           'Share… (AirDrop, Messages)',
         ),
       h('button', { class: 'btn btn-quiet', type: 'button', onclick: a.onRestart }, 'Make another'),
+      s.confirmClear ? clearConfirm(a) : clearOffer(a),
+    ];
+  } else if (e.kind === 'cleared') {
+    body = [
+      h(
+        'p',
+        { class: 'lede', role: 'status', 'data-testid': 'cleared' },
+        'Done. This app no longer holds your photos or your reel.',
+      ),
+      h(
+        'p',
+        { class: 'lede', 'data-testid': 'originals-note' },
+        'Your original photos are still in your Photos library. To delete them, open Photos and delete them yourself.',
+      ),
+      h(
+        'button',
+        { class: 'btn btn-primary', type: 'button', onclick: a.onRestart },
+        'Start again',
+      ),
     ];
   } else {
     body = [
