@@ -2,7 +2,7 @@ import { devices, expect, test } from '@playwright/test';
 
 // 390px-wide touch phone profile (Chromium).
 test.use({ ...devices['Pixel 7'], viewport: { width: 390, height: 844 } });
-import { makePhotos, reelIds } from './helpers';
+import { makePhotos, pickPhotos, reelIds } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./?fakes=1');
@@ -18,8 +18,10 @@ test('states the 5-50 range instead of failing silently', async ({ page }) => {
   await page.setInputFiles('#photo-input', few);
   await expect(page.getByRole('alert')).toContainText('at least 5');
   const many = await makePhotos(page, 51);
+  await page.getByRole('button', { name: 'Cancel' }).click();
   await page.setInputFiles('#photo-input', many);
   await expect(page.getByRole('alert')).toContainText('50 or fewer');
+  await expect(page.getByTestId('next')).toBeDisabled();
 });
 
 test('an undecodable HEIC shows a chip and is skipped, not dropped or crashed', async ({
@@ -31,7 +33,7 @@ test('an undecodable HEIC shows a chip and is skipped, not dropped or crashed', 
     mimeType: 'image/heic',
     buffer: Buffer.from('not really heic'),
   };
-  await page.setInputFiles('#photo-input', [...photos, heic]);
+  await pickPhotos(page, [...photos, heic]);
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   await expect(page.locator('.chip-warn')).toContainText('HEIC not supported in this browser');
   await expect(page.locator('.chip-warn')).toContainText('IMG_9000.HEIC');
@@ -40,7 +42,7 @@ test('an undecodable HEIC shows a chip and is skipped, not dropped or crashed', 
 test('plays first: photos in, a paused reel with a Play control, no track chosen', async ({
   page,
 }) => {
-  await page.setInputFiles('#photo-input', await makePhotos(page, 12));
+  await pickPhotos(page, await makePhotos(page, 12));
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   // a track is already chosen, and nothing autoplays (iOS needs a tap)
   await expect(page.getByTestId('customize-music')).toContainText('Chill');
@@ -58,7 +60,7 @@ test('plays first: photos in, a paused reel with a Play control, no track chosen
 });
 
 test('Music, Photos and Length are Customize actions on the playing reel', async ({ page }) => {
-  await page.setInputFiles('#photo-input', await makePhotos(page, 20));
+  await pickPhotos(page, await makePhotos(page, 20));
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   const total = async () =>
     Number(((await page.locator('.clock').textContent()) ?? '').split('/')[1]?.replace('s', ''));
@@ -81,7 +83,7 @@ test('Music, Photos and Length are Customize actions on the playing reel', async
 });
 
 test('core loop: pick 20, deselect one, reorder, preview, export, share', async ({ page }) => {
-  await page.setInputFiles('#photo-input', await makePhotos(page, 20));
+  await pickPhotos(page, await makePhotos(page, 20));
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   await page.getByTestId('customize-photos').click();
   await expect(page.getByRole('heading', { name: '10 in your reel' })).toBeVisible();
@@ -124,7 +126,7 @@ test('core loop: pick 20, deselect one, reorder, preview, export, share', async 
 test('left-out photos are grouped by reason, best first, with duplicates beside their winner', async ({
   page,
 }) => {
-  await page.setInputFiles('#photo-input', await makePhotos(page, 20));
+  await pickPhotos(page, await makePhotos(page, 20));
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   await page.getByTestId('customize-photos').click();
   await expect(page.getByRole('heading', { name: '10 in your reel' })).toBeVisible();
@@ -158,7 +160,7 @@ test('left-out photos are grouped by reason, best first, with duplicates beside 
 });
 
 test('a photo the user removed is not mislabelled as ranked lower', async ({ page }) => {
-  await page.setInputFiles('#photo-input', await makePhotos(page, 12));
+  await pickPhotos(page, await makePhotos(page, 12));
   await page.getByTestId('customize-photos').click();
   await page.getByRole('button', { name: 'Remove photo 1 from the reel' }).click();
   await expect(page.locator('[data-reason="removed"] .tile-add')).toHaveCount(1);
@@ -169,7 +171,7 @@ test('share is guarded by canShare and download is always there', async ({ page 
     (navigator as unknown as { canShare: unknown }).canShare = () => false;
   });
   await page.goto('./?fakes=1');
-  await page.setInputFiles('#photo-input', await makePhotos(page, 6));
+  await pickPhotos(page, await makePhotos(page, 6));
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   await page.getByTestId('next').click();
   await page.getByTestId('export').click();
@@ -186,7 +188,7 @@ test('share button calls navigator.share with the MP4 file when allowed', async 
     };
   });
   await page.goto('./?fakes=1');
-  await page.setInputFiles('#photo-input', await makePhotos(page, 6));
+  await pickPhotos(page, await makePhotos(page, 6));
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   await page.getByTestId('next').click();
   await page.getByTestId('export').click();
@@ -198,7 +200,7 @@ test('share button calls navigator.share with the MP4 file when allowed', async 
 
 test('silent render shows the add-sound hint, not a normal export', async ({ page }) => {
   await page.goto('./?fakes=1&silent=1');
-  await page.setInputFiles('#photo-input', await makePhotos(page, 6));
+  await pickPhotos(page, await makePhotos(page, 6));
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   await page.getByTestId('next').click();
   await page.getByTestId('export').click();
@@ -206,7 +208,7 @@ test('silent render shows the add-sound hint, not a normal export', async ({ pag
 });
 
 test('keyboard reorders from the drag handle and announces it', async ({ page }) => {
-  await page.setInputFiles('#photo-input', await makePhotos(page, 12));
+  await pickPhotos(page, await makePhotos(page, 12));
   await page.getByTestId('customize-photos').click();
   await expect(page.getByRole('heading', { name: '10 in your reel' })).toBeVisible();
   const before = await reelIds(page);
@@ -226,7 +228,7 @@ test('makes no network requests beyond the app origin', async ({ page }) => {
       foreign.push(r.url());
   });
   await page.goto('./?fakes=1');
-  await page.setInputFiles('#photo-input', await makePhotos(page, 6));
+  await pickPhotos(page, await makePhotos(page, 6));
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   await page.getByTestId('customize-music').click();
   await page.getByText('Upbeat', { exact: true }).click();
@@ -239,7 +241,7 @@ test('fits 390px with no horizontal overflow on every screen', async ({ page }) 
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
   expect(await overflow()).toBeLessThanOrEqual(0);
-  await page.setInputFiles('#photo-input', await makePhotos(page, 20));
+  await pickPhotos(page, await makePhotos(page, 20));
   await expect(page.getByTestId('beat-sync')).toBeVisible();
   expect(await overflow()).toBeLessThanOrEqual(0);
   await page.screenshot({ path: 'test-results/ui-preview-390.png', fullPage: true });
@@ -256,7 +258,7 @@ test('fits 390px with no horizontal overflow on every screen', async ({ page }) 
 
 test('reduced motion turns off interface transitions', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.setInputFiles('#photo-input', await makePhotos(page, 6));
+  await pickPhotos(page, await makePhotos(page, 6));
   await page.getByTestId('customize-photos').click();
   const dur = await page
     .locator('.tile')
@@ -271,7 +273,7 @@ test('the whole flow raises no Content-Security-Policy violations', async ({ pag
     if (/content security policy/i.test(m.text())) violations.push(m.text());
   });
   await page.goto('./?fakes=1');
-  await page.setInputFiles('#photo-input', await makePhotos(page, 6));
+  await pickPhotos(page, await makePhotos(page, 6));
   await expect(page.getByTestId('beat-sync')).toBeVisible();
   await page.getByTestId('next').click();
   await page.getByTestId('export').click();

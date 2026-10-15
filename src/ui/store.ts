@@ -1,13 +1,14 @@
 import { DEFAULT_LENGTH_MS } from './logic';
+import type { Staged } from './staging';
 import { initialRating, type RatingState } from './rating';
 import type { Engines, LoadedTrack, PhotoScore, ReelPlan } from './seams/types';
 
 // `pick` and `track` are the Customize screens (Photos, Music), reached from the preview.
-export type Step = 'add' | 'preview' | 'pick' | 'track' | 'export';
+export type Step = 'add' | 'review' | 'preview' | 'pick' | 'track' | 'export';
 /** The stepper shows three stages; the Customize screens count as the preview stage. */
 export const STEPS = ['add', 'preview', 'export'] as const;
 export const stageOf = (step: Step): (typeof STEPS)[number] =>
-  step === 'pick' || step === 'track' ? 'preview' : step;
+  step === 'pick' || step === 'track' ? 'preview' : step === 'review' ? 'add' : step;
 
 export interface Photo {
   id: string; // photoId from curation
@@ -29,6 +30,7 @@ export type ExportState =
 export interface State {
   step: Step;
   busy: string | null; // label while decoding / curating
+  staged: Staged[]; // just picked, shown in the review grid until Done
   files: File[]; // accepted, decodable files, in pick order
   skipped: Skipped[];
   notice: string | null; // count-range message etc.
@@ -47,6 +49,7 @@ export interface State {
 export const initialState = (): State => ({
   step: 'add',
   busy: null,
+  staged: [],
   files: [],
   skipped: [],
   notice: null,

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { devices, expect, test } from '@playwright/test';
-import { makeScenePhotos } from './helpers';
+import { makeScenePhotos, pickPhotos } from './helpers';
 
 // Every other UI spec pins `?fakes=1`, so the real curation engine and the real
 // bundled tracks are never driven end to end. This one loads the page as a user
@@ -42,7 +42,7 @@ test('real curation and real tracks: add photos and a reel is playable with no d
     page.evaluate(() => (window as unknown as { __playCalls: number }).__playCalls);
 
   await page.goto('./');
-  await page.setInputFiles('#photo-input', await makeScenePhotos(page, 12));
+  await pickPhotos(page, await makeScenePhotos(page, 12));
 
   // Zero decisions: photos in, and the next thing on screen is a reel, already cut to the default
   // track, waiting behind a large Play. No track was chosen, nothing was tapped, no alert.
@@ -137,7 +137,7 @@ test('a full run to a finished export makes no network request after page load',
     if (!/^(blob|data):/.test(req.url())) late.push(`${req.resourceType()} ${req.url()}`);
   });
 
-  await page.setInputFiles('#photo-input', await makeScenePhotos(page, 12));
+  await pickPhotos(page, await makeScenePhotos(page, 12));
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   // Play, then customise the music and the length: all of it must stay off the network.
   await page.getByTestId('play').click();

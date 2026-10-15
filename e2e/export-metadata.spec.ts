@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { makeScenePhotos } from './ui/helpers';
+import { makeScenePhotos, pickPhotos } from './ui/helpers';
 import { BUNDLED_TRACK_IDS, GATE_TRACK_ID } from '../src/render/e2e/harness-reel';
 import { startHarnessServer, type HarnessServer } from '../src/render/e2e/harness-server';
 import type { HarnessRun, HarnessRunOptions } from '../src/render/e2e/harness';
@@ -165,7 +165,7 @@ test('through the real UI: pick photos, customise the track, export, and read th
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.waitForLoadState('networkidle');
 
-  await page.setInputFiles('#photo-input', await makeScenePhotos(page, 12));
+  await pickPhotos(page, await makeScenePhotos(page, 12));
   await expect(page.getByRole('heading', { name: 'Watch it cut' })).toBeVisible();
   // The reel is already planned on the default track; this run customises it to the gate track.
   await page.getByTestId('customize-music').click();
