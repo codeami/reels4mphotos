@@ -2,14 +2,14 @@ import { devices, expect, test } from '@playwright/test';
 
 // 390px-wide touch phone profile (Chromium).
 test.use({ ...devices['Pixel 7'], viewport: { width: 390, height: 844 } });
-import { makePhotos, reelIds } from './helpers';
+import { makePhotos, pickPhotos, reelIds } from './helpers';
 
 // Real touch input via CDP (Chromium). Playwright's own touchscreen only taps,
 // so this is the closest automated stand-in for a finger drag on iOS Safari.
 test('dragging a tile handle by touch reorders the reel', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'CDP touch dispatch is Chromium-only');
   await page.goto('./?fakes=1');
-  await page.setInputFiles('#photo-input', await makePhotos(page, 12));
+  await pickPhotos(page, await makePhotos(page, 12));
   await page.getByTestId('customize-photos').click();
   await expect(page.getByRole('heading', { name: '10 in your reel' })).toBeVisible();
   const before = await reelIds(page);

@@ -1,5 +1,5 @@
 import { devices, expect, test, type Page } from '@playwright/test';
-import { makePhotos } from './helpers';
+import { makePhotos, pickPhotos } from './helpers';
 
 test.use({ ...devices['Pixel 7'], viewport: { width: 390, height: 844 } });
 
@@ -26,7 +26,7 @@ test.beforeEach(async ({ page }) => {
 test('advice card: plain words, what is strong and where a B-roll shot would help', async ({
   page,
 }) => {
-  await page.setInputFiles('#photo-input', await makePhotos(page, 12));
+  await pickPhotos(page, await makePhotos(page, 12));
   await expect(watchIt(page)).toBeVisible();
   const card = page.getByTestId('advice');
   await expect(card).toContainText('12 photos, 10 in your reel.');
@@ -36,7 +36,7 @@ test('advice card: plain words, what is strong and where a B-roll shot would hel
 });
 
 test('rating 5 stops and says the rating stays on the device', async ({ page }) => {
-  await page.setInputFiles('#photo-input', await makePhotos(page, 12));
+  await pickPhotos(page, await makePhotos(page, 12));
   await expect(watchIt(page)).toBeVisible();
   const before = await reelOrder(page);
   await page.getByRole('button', { name: 'Rate 5 out of 5' }).click();
@@ -51,7 +51,7 @@ test('rating 5 stops and says the rating stays on the device', async ({ page }) 
 test('rating 1 to 4 makes a different reel, three times, then says so plainly', async ({
   page,
 }) => {
-  await page.setInputFiles('#photo-input', await makePhotos(page, 12));
+  await pickPhotos(page, await makePhotos(page, 12));
   await expect(watchIt(page)).toBeVisible();
   const seen = [await reelOrder(page)];
   for (const [retry, stars] of [
@@ -81,7 +81,7 @@ test('ratings are not saved or sent anywhere', async ({ page }) => {
     if (!/^(blob|data):/.test(r.url()) && new URL(r.url()).hostname !== 'localhost')
       foreign.push(r.url());
   });
-  await page.setInputFiles('#photo-input', await makePhotos(page, 8));
+  await pickPhotos(page, await makePhotos(page, 8));
   await expect(watchIt(page)).toBeVisible();
   await page.getByRole('button', { name: 'Rate 2 out of 5' }).click();
   await expect(page.getByTestId('rating-note')).toContainText('Rated 2');
@@ -110,7 +110,7 @@ test('export, then clear: says what goes and what stays, then leaves the app emp
     };
   });
   await page.goto('./?fakes=1');
-  await page.setInputFiles('#photo-input', await makePhotos(page, 12));
+  await pickPhotos(page, await makePhotos(page, 12));
   await expect(watchIt(page)).toBeVisible();
   await page.getByTestId('next').click();
   await page.getByTestId('export').click();

@@ -905,3 +905,66 @@ h3 {
   display: grid;
   gap: var(--space-2);
 }
+
+/* review grid: the picked photos, as large as a phone allows */
+.review-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+@media (min-width: 600px) {
+  .review-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.review-tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  border: 2px solid var(--paper);
+  background: var(--film-2);
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color var(--dur) var(--ease);
+}
+.review-tile canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+}
+.review-tile.is-out {
+  border-color: var(--line);
+}
+.review-tile.is-out canvas {
+  opacity: 0.3;
+  filter: grayscale(1);
+}
+.review-tile:focus-visible {
+  outline: 3px solid var(--amber);
+  outline-offset: 2px;
+}
+.review-mark {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  background: var(--ok);
+  color: var(--ink);
+}
+.review-tile.is-out .review-mark {
+  background: var(--safelight);
+  color: var(--safelight-ink);
+}

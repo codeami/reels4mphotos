@@ -100,3 +100,9 @@ export async function makeScenePhotos(page: Page, n: number): Promise<Pick[]> {
     buffer: Buffer.from(b, 'base64'),
   }));
 }
+
+/** Picks files and presses Done on the review grid, keeping every photo. */
+export async function pickPhotos(page: Page, files: Pick[]) {
+  await page.setInputFiles('#photo-input', files);
+  await page.getByTestId('next').click();
+}

@@ -11,9 +11,11 @@ import { customizeBlock } from './screens/customize';
 import { exportScreen } from './screens/export';
 import { pickScreen } from './screens/pick';
 import { previewScreen, type PreviewHandle } from './screens/preview';
+import { reviewScreen } from './screens/review';
 import { ratingBlock } from './screens/rating';
 import { stopSample, trackScreen } from './screens/track';
 import type { Engines } from './seams/types';
+import { createThumbs, keptFiles, stage, toggleKept } from './staging';
 import { createStore, stageOf, STEPS, type Photo, type State } from './store';
 
 const TITLES: Record<(typeof STEPS)[number], string> = {
@@ -31,6 +33,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
   let bitmaps = new Map<string, ImageBitmap>();
   let pendingFocus: string | null = null;
   let ratingEl: HTMLElement | null = null;
+  const thumbs = createThumbs();
 
   // Background only: a failure is not the user's problem, the export path copes on its own.
   // `data-warm` marks the moment load-time requests are over, for the zero-request E2E.
@@ -53,6 +56,30 @@ export function createApp(root: HTMLElement, engines: Engines) {
     if (s.exp.kind === 'done') URL.revokeObjectURL(s.exp.url);
   }
 
+  /** The picker returned: show every photo big, so the user can keep or remove each before curation. */
+  function onPicked(picked: File[]) {
+    if (picked.length === 0) return;
+    const staged = stage(picked);
+    store.set({
+      staged,
+      step: 'review',
+      notice: null,
+      skipped: [],
+      announce: `${picked.length} photos picked. Tap a photo to take it out.`,
+    });
+    void thumbs.load(staged);
+  }
+
+  function onReviewToggle(id: number) {
+    pendingFocus = `[data-review-tile][aria-label^="Photo ${id + 1},"]`;
+    store.set({ staged: toggleKept(store.get().staged, id) });
+  }
+
+  function releaseStaged() {
+    thumbs.release();
+    store.set({ staged: [] });
+  }
+
   async function handleFiles(picked: File[]) {
     if (picked.length === 0) return;
     const count = checkCount(picked.length);
@@ -60,7 +87,9 @@ export function createApp(root: HTMLElement, engines: Engines) {
       store.set({ notice: count.message, skipped: [] });
       return;
     }
-    store.set({ busy: 'Checking photos…', notice: null, skipped: [] });
+    // The picks are now in `picked`; free the grid's thumbnails and show progress on the first screen.
+    thumbs.release();
+    store.set({ staged: [], step: 'add', busy: 'Checking photos…', notice: null, skipped: [] });
     const { files, skipped } = await intake(picked);
     const after = checkCount(files.length);
     if (!after.ok) {
@@ -294,6 +323,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
 
   function goto(step: State['step']) {
     stopSample();
+    if (step === 'add' && store.get().staged.length > 0) releaseStaged();
     if (step !== 'preview') closePreview();
     store.set({ step, notice: null, confirmClear: false });
     const { trackId, track } = store.get();
@@ -338,6 +368,17 @@ export function createApp(root: HTMLElement, engines: Engines) {
       );
     const busy = s.busy !== null;
     switch (s.step) {
+      case 'review': {
+        const kept = s.staged.filter((x) => x.kept).length;
+        return [
+          ghost('Cancel', 'add'),
+          primary(
+            `Done · ${kept}`,
+            () => void handleFiles(keptFiles(s.staged)),
+            !checkCount(kept).ok || busy,
+          ),
+        ];
+      }
       case 'preview':
         return [ghost('New photos', 'add'), primary('Export', () => goto('export'), busy)];
       case 'pick':
@@ -355,6 +396,8 @@ export function createApp(root: HTMLElement, engines: Engines) {
 
   function screenFor(s: State): HTMLElement {
     switch (s.step) {
+      case 'review':
+        return reviewScreen(s.staged, thumbs, { onToggle: onReviewToggle });
       case 'pick':
         return pickScreen(s, { onToggle, onMove });
       case 'track':
@@ -393,7 +436,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
           },
         });
       default:
-        return addScreen(s, { onFiles: (f) => void handleFiles(f) });
+        return addScreen(s, { onFiles: onPicked });
     }
   }
 
