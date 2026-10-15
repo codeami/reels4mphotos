@@ -838,3 +838,70 @@ h3 {
     opacity: 1;
   }
 }
+
+/* advice card, rating, clear confirmation */
+.advice,
+.rating,
+.clear-offer,
+.clear-confirm {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.advice h4 {
+  margin: 0;
+  font: 600 0.875rem var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+}
+.advice-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+}
+.advice-good li::marker {
+  color: var(--paper-dim);
+}
+.advice-tips li::marker {
+  color: var(--amber);
+}
+.rating-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.rating-btn {
+  flex: 1;
+  min-height: var(--tap);
+  border: 1.5px solid var(--line);
+  background: transparent;
+  color: var(--paper);
+  font: 600 1.125rem var(--font-mono);
+  cursor: pointer;
+}
+.rating-btn.is-on {
+  border-color: var(--safelight);
+  background: var(--safelight);
+  color: var(--safelight-ink);
+}
+.clear-confirm {
+  border: 1px solid var(--amber);
+  padding: var(--space-4);
+}
+.clear-confirm h3,
+.clear-confirm p,
+.clear-list {
+  margin: 0;
+}
+.clear-list {
+  padding-left: var(--space-5);
+}
+.clear-keeps strong {
+  color: var(--amber);
+}
+.clear-actions {
+  display: grid;
+  gap: var(--space-2);
+}

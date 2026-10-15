@@ -1,12 +1,17 @@
+import { adviceFor, analyseSet } from '../curation/advice';
+import { rerollReel } from '../curation/reroll';
 import { h } from './dom';
 import { intake } from './intake';
 import { checkCount, MIN_PHOTOS, move, toggle } from './logic';
+import { decideRating, initialRating, NOTES, rerollPool } from './rating';
 import { enableDragReorder } from './reorder';
 import { addScreen, skippedChips } from './screens/add';
+import { adviceCard } from './screens/advice';
 import { customizeBlock } from './screens/customize';
 import { exportScreen } from './screens/export';
 import { pickScreen } from './screens/pick';
 import { previewScreen, type PreviewHandle } from './screens/preview';
+import { ratingBlock } from './screens/rating';
 import { stopSample, trackScreen } from './screens/track';
 import type { Engines } from './seams/types';
 import { createStore, stageOf, STEPS, type Photo, type State } from './store';
@@ -25,6 +30,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
   let previewFor: unknown = null;
   let bitmaps = new Map<string, ImageBitmap>();
   let pendingFocus: string | null = null;
+  let ratingEl: HTMLElement | null = null;
 
   // Background only: a failure is not the user's problem, the export path copes on its own.
   // `data-warm` marks the moment load-time requests are over, for the zero-request E2E.
@@ -86,6 +92,8 @@ export function createApp(root: HTMLElement, engines: Engines) {
         track: null,
         notice: null,
         exp: { kind: 'idle' },
+        rating: initialRating(),
+        confirmClear: false,
         announce: `${order.length} of ${photos.length} photos chosen.`,
       });
       await openWithDefaultTrack();
@@ -98,7 +106,12 @@ export function createApp(root: HTMLElement, engines: Engines) {
   }
 
   function setOrder(order: string[], message: string) {
-    store.set({ order, plan: null, announce: message });
+    store.set({
+      order,
+      plan: null,
+      rating: { ...store.get().rating, value: null, note: null },
+      announce: message,
+    });
   }
 
   function onMove(from: number, to: number) {
@@ -170,7 +183,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
         const photo = s.photos.find((p) => p.id === id);
         return photo ? [{ photoId: id, width: photo.score.width, height: photo.score.height }] : [];
       });
-      const plan = engines.plan(chosen, s.track.beatmap, s.lengthMs);
+      const plan = engines.plan(chosen, s.track.beatmap, s.lengthMs, s.rating.transitionOffset);
       const next = new Map<string, ImageBitmap>();
       for (const shot of plan.shots) {
         const file = s.photos.find((p) => p.id === shot.photoId)?.file;
@@ -186,6 +199,43 @@ export function createApp(root: HTMLElement, engines: Engines) {
         notice: `Could not build the preview: ${err instanceof Error ? err.message : String(err)}`,
       });
     }
+  }
+
+  /** 5 keeps the reel. 1 to 4 plans another one that avoids what the last reels used, up to the cap. */
+  function rate(value: number) {
+    const s = store.get();
+    const decision = decideRating(s.rating, value);
+    if (decision !== 'retry') {
+      pendingFocus = `[data-rate="${value}"]`;
+      const note = decision === 'stop' ? NOTES.stop : NOTES.cap;
+      store.set({ rating: { ...s.rating, value, note }, announce: note });
+      return;
+    }
+    const past = [
+      ...s.rating.seen,
+      { order: s.order, transitionOffset: s.rating.transitionOffset },
+    ];
+    const next = rerollReel(rerollPool(s.photos, s.order), s.order.length, past, past.length);
+    const retries = s.rating.retries + 1;
+    const note = NOTES.retry(value, retries);
+    store.set({
+      order: next.chosen.map((c) => c.photoId),
+      rating: { value: null, retries, seen: past, transitionOffset: next.transitionOffset, note },
+      announce: note,
+    });
+    void goPreview();
+  }
+
+  function clearAppCopies() {
+    stopSample();
+    closePreview();
+    revokePhotoUrls(store.get());
+    store.reset();
+    store.set({
+      step: 'export',
+      exp: { kind: 'cleared' },
+      announce: 'Cleared. This app no longer holds your photos or your reel.',
+    });
   }
 
   async function startExport() {
@@ -245,7 +295,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
   function goto(step: State['step']) {
     stopSample();
     if (step !== 'preview') closePreview();
-    store.set({ step, notice: null });
+    store.set({ step, notice: null, confirmClear: false });
     const { trackId, track } = store.get();
     if (step === 'track' && trackId && !track) void chooseTrack(trackId);
   }
@@ -295,7 +345,9 @@ export function createApp(root: HTMLElement, engines: Engines) {
       case 'track':
         return [primary('Done', () => void goPreview(), !s.track || busy)];
       case 'export':
-        return s.exp.kind === 'rendering' ? [] : [ghost('Back', 'preview')];
+        return s.exp.kind === 'rendering' || s.exp.kind === 'cleared'
+          ? []
+          : [ghost('Back', 'preview')];
       default:
         return [];
     }
@@ -312,7 +364,10 @@ export function createApp(root: HTMLElement, engines: Engines) {
         });
       case 'preview': {
         if (!s.plan || !s.track) return h('section', { class: 'screen' });
+        ratingEl = ratingBlock(s.rating, { onRate: rate });
         preview = previewScreen(s.plan, bitmaps, s.track.audioUrl, s.track.beatmap, [
+          ratingEl,
+          adviceCard(adviceFor(analyseSet(s.photos.map((p) => p.score)))),
           customizeBlock(s, { onCustomize: goto, onLength: setLength }),
           s.skipped.length > 0 && skippedChips(s.skipped),
         ]);
@@ -325,6 +380,12 @@ export function createApp(root: HTMLElement, engines: Engines) {
           onShare: () => void share(),
           onSaved: markSaved,
           canShare,
+          onAskClear: () => {
+            pendingFocus = '#h-clear';
+            store.set({ confirmClear: true });
+          },
+          onCancelClear: () => store.set({ confirmClear: false }),
+          onClear: clearAppCopies,
           onRestart: () => {
             closePreview();
             revokePhotoUrls(store.get());
@@ -353,6 +414,12 @@ export function createApp(root: HTMLElement, engines: Engines) {
       stepper(s),
     );
     const keepPreview = s.step === 'preview' && preview && previewFor === s.plan;
+    if (keepPreview && ratingEl) {
+      // The reel keeps playing; only the rating row and its note change.
+      const next = ratingBlock(s.rating, { onRate: rate });
+      ratingEl.replaceWith(next);
+      ratingEl = next;
+    }
     if (!keepPreview) {
       const screen = screenFor(s);
       if (s.busy) screen.append(h('p', { class: 'busy', role: 'status' }, s.busy));

@@ -56,7 +56,12 @@ export interface Engines {
   /** Choose the best photos, in reel order. Needs no track. */
   select(files: File[], opts: SelectOptions): Promise<Selection>;
   /** Plan a reel from these photos, in this order, on a track's beats. */
-  plan(photos: PlanPhoto[], beatmap: BeatMap, targetMs?: number): ReelPlan;
+  plan(
+    photos: PlanPhoto[],
+    beatmap: BeatMap,
+    targetMs?: number,
+    transitionOffset?: number,
+  ): ReelPlan;
   render(
     plan: ReelPlan,
     photos: Map<string, Blob>,

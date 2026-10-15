@@ -73,7 +73,12 @@ const REASONS = [
   'overexposed',
 ] as const;
 
-function buildPlan(order: PlanPhoto[], beatmap: BeatMap, targetMs = 20_000): ReelPlan {
+function buildPlan(
+  order: PlanPhoto[],
+  beatmap: BeatMap,
+  targetMs = 20_000,
+  transitionOffset = 0,
+): ReelPlan {
   const beats = beatmap.beatsMs;
   // Cuts land exactly on beat times; a longer target spaces them wider.
   const shotMs = Math.max(500, targetMs / Math.max(1, order.length));
@@ -88,7 +93,7 @@ function buildPlan(order: PlanPhoto[], beatmap: BeatMap, targetMs = 20_000): Ree
       photoId: p.photoId,
       startMs,
       durationMs: Math.max(500, endMs - startMs),
-      transition: i % 3 === 2 ? 'crossfade' : 'cut',
+      transition: (i + transitionOffset) % 3 === 2 ? 'crossfade' : 'cut',
       kenBurns: zoomIn ? { from: wide, to: tight } : { from: tight, to: wide },
     };
   });
@@ -124,6 +129,8 @@ async function fakeSelect(files: File[], opts: SelectOptions): Promise<Selection
       ...s,
       selected: kept.has(s.index),
       dropReason,
+      width: 400,
+      height: 600,
       ...(dropReason === 'near-duplicate' && winner ? { duplicateOf: winner } : {}),
       timeMs: s.index,
       timeSource: 'pickOrder',
