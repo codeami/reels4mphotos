@@ -9,13 +9,15 @@ import { addScreen, skippedChips } from './screens/add';
 import { adviceCard } from './screens/advice';
 import { customizeBlock } from './screens/customize';
 import { exportScreen } from './screens/export';
+import { looksRow } from './screens/looks';
 import { pickScreen } from './screens/pick';
 import { previewScreen, type PreviewHandle } from './screens/preview';
 import { reviewScreen } from './screens/review';
 import { ratingBlock } from './screens/rating';
 import { stopSample, trackScreen } from './screens/track';
-import type { Engines } from './seams/types';
+import type { Engines, LookId } from './seams/types';
 import { createThumbs, keptFiles, stage, toggleKept } from './staging';
+import { LOOKS } from '../looks';
 import { createStore, stageOf, STEPS, type Photo, type State } from './store';
 
 const TITLES: Record<(typeof STEPS)[number], string> = {
@@ -33,6 +35,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
   let bitmaps = new Map<string, ImageBitmap>();
   let pendingFocus: string | null = null;
   let ratingEl: HTMLElement | null = null;
+  let looksEl: HTMLElement | null = null;
   const thumbs = createThumbs();
 
   // Background only: a failure is not the user's problem, the export path copes on its own.
@@ -203,6 +206,15 @@ export function createApp(root: HTMLElement, engines: Engines) {
     void goPreview();
   }
 
+  function setLook(look: LookId) {
+    if (look === store.get().look) return;
+    const chip = `[data-look="${look}"]`;
+    pendingFocus = chip;
+    store.set({ look, announce: `${LOOKS[look].name} look.` });
+    // the new cut replaces the screen, so the chip is found and focused again once it is up
+    void goPreview().then(() => main.querySelector<HTMLElement>(chip)?.focus());
+  }
+
   async function goPreview() {
     const s = store.get();
     if (!s.track) return;
@@ -212,14 +224,28 @@ export function createApp(root: HTMLElement, engines: Engines) {
         const photo = s.photos.find((p) => p.id === id);
         return photo ? [{ photoId: id, width: photo.score.width, height: photo.score.height }] : [];
       });
-      const plan = engines.plan(chosen, s.track.beatmap, s.lengthMs, s.rating.transitionOffset);
+      const plan = engines.plan(
+        chosen,
+        s.track.beatmap,
+        s.lengthMs,
+        s.rating.transitionOffset,
+        s.look,
+      );
+      // Flipping looks re-cuts the same photos, so the ones already decoded are kept.
       const next = new Map<string, ImageBitmap>();
       for (const shot of plan.shots) {
         const file = s.photos.find((p) => p.id === shot.photoId)?.file;
-        if (file && !next.has(shot.photoId))
-          next.set(shot.photoId, await createImageBitmap(file, { resizeWidth: BITMAP_WIDTH }));
+        if (next.has(shot.photoId) || !file) continue;
+        next.set(
+          shot.photoId,
+          bitmaps.get(shot.photoId) ??
+            (await createImageBitmap(file, { resizeWidth: BITMAP_WIDTH })),
+        );
       }
-      closePreview();
+      preview?.destroy();
+      preview = null;
+      previewFor = null;
+      bitmaps.forEach((b, id) => next.get(id) === b || b.close());
       bitmaps = next;
       store.set({ busy: null, plan, step: 'preview', exp: { kind: 'idle' } });
     } catch (err) {
@@ -277,13 +303,28 @@ export function createApp(root: HTMLElement, engines: Engines) {
         const p = s.photos.find((x) => x.id === shot.photoId);
         if (p) photos.set(p.id, p.file);
       }
-      const { blob, silent } = await engines.render(s.plan, photos, s.track.beatmap, (progress) => {
-        if (store.get().exp.kind === 'rendering')
-          store.set({ exp: { kind: 'rendering', progress } });
-      });
+      const withoutMusic = s.withoutMusic;
+      const { blob, silent } = await engines.render(
+        s.plan,
+        photos,
+        s.track.beatmap,
+        (progress) => {
+          if (store.get().exp.kind === 'rendering')
+            store.set({ exp: { kind: 'rendering', progress } });
+        },
+        undefined,
+        { withoutMusic },
+      );
       const file = new File([blob], 'reel.mp4', { type: 'video/mp4' });
       store.set({
-        exp: { kind: 'done', file, silent, url: URL.createObjectURL(file), saved: false },
+        exp: {
+          kind: 'done',
+          file,
+          silent,
+          withoutMusic,
+          url: URL.createObjectURL(file),
+          saved: false,
+        },
         announce: silent ? 'Export finished, without sound.' : 'Export finished.',
       });
     } catch (err) {
@@ -408,7 +449,9 @@ export function createApp(root: HTMLElement, engines: Engines) {
       case 'preview': {
         if (!s.plan || !s.track) return h('section', { class: 'screen' });
         ratingEl = ratingBlock(s.rating, { onRate: rate });
+        looksEl = looksRow(s.look, { onLook: setLook });
         preview = previewScreen(s.plan, bitmaps, s.track.audioUrl, s.track.beatmap, [
+          looksEl,
           ratingEl,
           adviceCard(adviceFor(analyseSet(s.photos.map((p) => p.score)))),
           customizeBlock(s, { onCustomize: goto, onLength: setLength }),
@@ -420,6 +463,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
       case 'export':
         return exportScreen(s, {
           onStart: () => void startExport(),
+          onWithoutMusic: (withoutMusic) => store.set({ withoutMusic }),
           onShare: () => void share(),
           onSaved: markSaved,
           canShare,
@@ -462,6 +506,12 @@ export function createApp(root: HTMLElement, engines: Engines) {
       const next = ratingBlock(s.rating, { onRate: rate });
       ratingEl.replaceWith(next);
       ratingEl = next;
+    }
+    if (keepPreview && looksEl) {
+      // The chip you tapped lights up at once, while the new cut is still being built.
+      const next = looksRow(s.look, { onLook: setLook });
+      looksEl.replaceWith(next);
+      looksEl = next;
     }
     if (!keepPreview) {
       const screen = screenFor(s);

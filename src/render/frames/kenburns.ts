@@ -13,6 +13,10 @@ export interface PixelRect {
 const FRAME_ASPECT = FRAME_WIDTH / FRAME_HEIGHT;
 // Curation rounds its rects, so a crop may miss 9:16 by a hair.
 const ASPECT_TOLERANCE = 0.02;
+// A look that fits crops inside the frame (letterbox, blur fill) takes any shape but a sliver.
+const MAX_FITTED_ASPECT = 5;
+
+export type CropFit = 'cover' | 'contain';
 
 export function smoothstep(t: number): number {
   const c = Math.min(1, Math.max(0, t));
@@ -28,13 +32,27 @@ export function interpolateRect(from: Rect, to: Rect, t: number): Rect {
 // already 9:16 in the photo's own pixels, so it is drawn straight into the 1080x1920 frame with no
 // fitting. This asserts that contract instead of quietly repairing a violation: stretching a photo
 // would be a wrong reel the user cannot see the cause of.
+//
+// A look whose `fit` is 'contain' (letterbox, blurred or coloured fill) draws the crop inside the
+// frame instead of filling it, so its crops need not be 9:16. They still may not be slivers, which
+// would fit as a thin stripe and look like a bug.
 export function assertCropAspect(
   rect: Rect,
   photoWidth: number,
   photoHeight: number,
   label: string,
+  fit: CropFit = 'cover',
 ): void {
   const aspect = (rect.w * photoWidth) / (rect.h * photoHeight);
+  if (fit === 'contain') {
+    if (aspect > MAX_FITTED_ASPECT || aspect < 1 / MAX_FITTED_ASPECT) {
+      throw new RenderError(
+        'invalid-plan',
+        `${label} is ${aspect.toFixed(3)} wide-to-tall in the photo's pixels, too thin to fit inside the frame`,
+      );
+    }
+    return;
+  }
   if (Math.abs(aspect / FRAME_ASPECT - 1) > ASPECT_TOLERANCE) {
     throw new RenderError(
       'invalid-plan',
@@ -48,18 +66,21 @@ export function sourceRectFor(
   progress: number,
   photoWidth: number,
   photoHeight: number,
+  fit: CropFit = 'cover',
 ): PixelRect {
   assertCropAspect(
     shot.kenBurns.from,
     photoWidth,
     photoHeight,
     `photo "${shot.photoId}" kenBurns.from`,
+    fit,
   );
   assertCropAspect(
     shot.kenBurns.to,
     photoWidth,
     photoHeight,
     `photo "${shot.photoId}" kenBurns.to`,
+    fit,
   );
   const rect = interpolateRect(shot.kenBurns.from, shot.kenBurns.to, smoothstep(progress));
   return {

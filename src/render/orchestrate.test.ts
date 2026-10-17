@@ -139,6 +139,38 @@ describe('orchestrate', () => {
     expect(loadTrack).not.toHaveBeenCalled();
   });
 
+  describe('without music, when the user asks for it', () => {
+    it('runs only the video-only path and fetches no track, though every audio path could run', async () => {
+      const loadTrack = vi.fn(async () => trackBytes);
+      const decodeTrack = vi.fn(async () => decodedTrack);
+      const h = harness({ loadTrack, decodeTrack });
+      const { report } = await render(h, { withoutMusic: true });
+      expect(h.ran).toEqual(['silent']);
+      expect(loadTrack).not.toHaveBeenCalled();
+      expect(decodeTrack).not.toHaveBeenCalled();
+      expect(report).toMatchObject({ path: 'silent', audio: 'none', hasAudio: false });
+    });
+
+    it('gives no fallback hint, because the silence was asked for', async () => {
+      const { report } = await render(harness(), { withoutMusic: true });
+      expect(report.silentHint).toBeNull();
+    });
+
+    it('still reports how far the cuts sit from the beats of the chosen track', async () => {
+      const { report } = await render(harness(), { withoutMusic: true });
+      expect(report.beatAlignment.boundaries).toBe(plan.shots.length - 1);
+      expect(report.beatAlignment.offBeat).toEqual([]);
+    });
+
+    it('says plainly when this browser cannot make a video-only file', async () => {
+      const h = harness({ webcodecs: { videoH264: false } });
+      await expect(render(h, { withoutMusic: true })).rejects.toThrow(
+        /cannot export without music/,
+      );
+      expect(h.ran).toEqual([]);
+    });
+  });
+
   it('hands over to the next path when one fails mid-render, and records the failure', async () => {
     const h = harness({
       failing: { 'webcodecs-aac': new RenderError('encoder-failed', 'AudioEncoder error 12') },

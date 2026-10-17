@@ -23,3 +23,15 @@ export function getRenderContext(canvas: RenderCanvas): RenderContext {
   if (!ctx) throw new RenderError('unsupported', '2d canvas context unavailable');
   return ctx;
 }
+
+// A small off-screen canvas for the pieces a look is built from (the blurred fill, the grain tile).
+export function createScratchCanvas(width: number, height: number): RenderCanvas {
+  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(width, height);
+  if (typeof document === 'undefined') {
+    throw new RenderError('unsupported', 'no canvas available in this scope');
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}

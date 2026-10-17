@@ -2,8 +2,10 @@ import type {
   BeatMap,
   Engines,
   LoadedTrack,
+  LookId,
   PlanPhoto,
   ReelPlan,
+  RenderChoices,
   RenderOutcome,
   SelectOptions,
   Selection,
@@ -95,6 +97,7 @@ export async function realEngines(): Promise<Partial<Engines>> {
         b: BeatMap,
         targetMs?: number,
         transitionOffset?: number,
+        look?: LookId,
       ) => ReelPlan;
     };
     out.select = mod.selectPhotos;
@@ -108,13 +111,23 @@ export async function realEngines(): Promise<Partial<Engines>> {
         ph: Map<string, Blob>,
         b: BeatMap,
         cb: (n: number) => void,
-        options?: { trackBytes?: ArrayBuffer },
+        options?: { trackBytes?: ArrayBuffer; withoutMusic?: boolean },
       ) => Promise<Blob>;
       warmUpRenderer?: () => Promise<void>;
     };
     out.warmUp = mod.warmUpRenderer;
-    out.render = async (plan, photos, beatmap, onProgress, trackBytes): Promise<RenderOutcome> => {
-      const blob = await mod.renderReel(plan, photos, beatmap, onProgress, { trackBytes });
+    out.render = async (
+      plan,
+      photos,
+      beatmap,
+      onProgress,
+      trackBytes,
+      choices?: RenderChoices,
+    ): Promise<RenderOutcome> => {
+      const blob = await mod.renderReel(plan, photos, beatmap, onProgress, {
+        trackBytes,
+        withoutMusic: choices?.withoutMusic,
+      });
       // ASSUMED: the render engine flags a silent fallback on the blob itself.
       return { blob, silent: (blob as Blob & { silent?: boolean }).silent === true };
     };
@@ -137,8 +150,16 @@ export async function resolveEngines(forceFake = false): Promise<Engines> {
     select: real.select ?? fake.select,
     plan: real.plan ?? fake.plan,
     render: realRender
-      ? async (plan, photos, beatmap, onProgress) =>
-          realRender(plan, photos, beatmap, onProgress, await trackStore.bytes(plan.trackId))
+      ? async (plan, photos, beatmap, onProgress, _bytes, choices) =>
+          // a video with no music needs no track, so none is awaited
+          realRender(
+            plan,
+            photos,
+            beatmap,
+            onProgress,
+            choices?.withoutMusic ? undefined : await trackStore.bytes(plan.trackId),
+            choices,
+          )
       : fake.render,
     // settles once the tracks are in memory and the renderer has warmed up; never rejects
     warmUp: () =>

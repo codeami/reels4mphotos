@@ -70,6 +70,43 @@ describe('assertCropAspect', () => {
   });
 });
 
+describe('assertCropAspect for a look that fits the photo inside the frame', () => {
+  const whole = { x: 0, y: 0, w: 1, h: 1 };
+
+  it('takes a crop of any ordinary shape, where the default still demands 9:16', () => {
+    expect(() => assertCropAspect(whole, 4000, 3000, 'crop', 'contain')).not.toThrow();
+    expect(() => assertCropAspect(whole, 3000, 4000, 'crop', 'contain')).not.toThrow();
+    expect(() => assertCropAspect(FULL_HEIGHT, 4000, 3000, 'crop', 'contain')).not.toThrow();
+    expect(() => assertCropAspect(whole, 4000, 3000, 'crop', 'cover')).toThrow(/not 9:16/);
+    expect(() => assertCropAspect(whole, 4000, 3000, 'crop')).toThrow(/not 9:16/);
+  });
+
+  it('still refuses a sliver, which would fit as a thin stripe', () => {
+    const strip = { x: 0, y: 0, w: 1, h: 0.05 };
+    expect(() => assertCropAspect(strip, 4000, 3000, 'crop', 'contain')).toThrow(RenderError);
+    expect(() => assertCropAspect(strip, 4000, 3000, 'crop', 'contain')).toThrow(/too thin/);
+    const column = { x: 0, y: 0, w: 0.05, h: 1 };
+    expect(() => assertCropAspect(column, 4000, 3000, 'crop', 'contain')).toThrow(RenderError);
+  });
+
+  it('lets sourceRectFor read a whole-photo move, and refuses it by default', () => {
+    const shot = {
+      photoId: 'a',
+      startMs: 0,
+      durationMs: 1000,
+      transition: 'cut' as const,
+      kenBurns: { from: whole, to: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 } },
+    };
+    expect(sourceRectFor(shot, 0, 4000, 3000, 'contain')).toEqual({
+      sx: 0,
+      sy: 0,
+      sw: 4000,
+      sh: 3000,
+    });
+    expect(() => sourceRectFor(shot, 0, 4000, 3000)).toThrow(RenderError);
+  });
+});
+
 describe('sourceRectFor', () => {
   const shot = {
     photoId: 'a',

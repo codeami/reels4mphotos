@@ -1,7 +1,7 @@
 import { buildPlan } from '../../curation/plan';
 import type { PlanPhoto } from '../../curation/types';
 import type { BeatMap } from '../beat-map';
-import type { ReelPlan } from '../../types/reel-plan';
+import type { LookId, ReelPlan } from '../../types/reel-plan';
 
 export const GATE_TRACK_ID = 'upbeat-ruby-2';
 export const BUNDLED_TRACK_IDS = [
@@ -21,7 +21,8 @@ export interface HarnessReel {
 
 // A plan built by curation's own planner from a bundled track's committed beat map, so the
 // renderer is exercised on what the app really produces: cuts on real beats, real Ken Burns crops.
-// `shotCount` keeps the first shots only, for renders that need not run the full 20 s.
+// `shotCount` keeps the first shots only, for renders that need not run the full 20 s. A look that
+// cuts faster than the classic reel goes round the ten photos more than once.
 const beatmaps = new Map<string, Promise<BeatMap>>();
 
 // Fetched once per page, the way the app loads a beat map when a track is picked.
@@ -39,13 +40,14 @@ function loadBeatMap(trackId: string): Promise<BeatMap> {
 export async function buildHarnessReel(
   trackId: string = GATE_TRACK_ID,
   shotCount = 10,
+  look: LookId = 'classic',
 ): Promise<HarnessReel> {
   const beatmap = await loadBeatMap(trackId);
   const photos: PlanPhoto[] = Array.from({ length: 10 }, (_, i) => ({
     photoId: `photo-${i}`,
     ...harnessPhotoSize(i),
   }));
-  const full = buildPlan(photos, beatmap, 20_000);
+  const full = buildPlan(photos, beatmap, 20_000, 0, look);
   const shots = full.shots.slice(0, shotCount);
   const last = shots[shots.length - 1];
   if (!last) throw new Error('the harness plan has no shots');

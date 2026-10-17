@@ -1,4 +1,6 @@
-import { CROSSFADE_FRAMES, FPS } from '../constants';
+import { FPS } from '../constants';
+import { lookOf } from '../../looks';
+import { ease } from './effects';
 import { RenderError } from '../errors';
 import type { ReelPlan } from '../../types/reel-plan';
 import { assertValidPlan } from './validate-plan';
@@ -14,6 +16,9 @@ export interface FrameLayer {
 export interface FrameDescriptor {
   readonly index: number;
   readonly timeMs: number;
+  // Frames since the newest layer's shot began: 0 on the cut itself. Looks time their per-beat
+  // effects (punch, flash) from it. Negative while that shot is still fading in before its beat.
+  readonly sinceCut: number;
   // Bottom to top. The bottom layer is always opaque.
   readonly layers: readonly FrameLayer[];
 }
@@ -38,10 +43,11 @@ const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 
 // Maps plan time to frames with integer maths only, so the same plan always yields the same
 // frames. A shot begins on the frame nearest its startMs (<= half a frame from the beat). A
-// crossfade into shot k is centred on that boundary frame: it claims the CROSSFADE_FRAMES
+// crossfade into shot k is centred on that boundary frame: it claims the look's crossfadeFrames
 // around it, shrunk when either neighbouring shot is shorter, and is dropped below 2 frames.
 export function buildTimeline(plan: ReelPlan): Timeline {
   assertValidPlan(plan);
+  const look = lookOf(plan);
 
   const frameCount = toFrame(plan.totalMs);
   const shotStartFrames = plan.shots.map((shot, k) => (k === 0 ? 0 : toFrame(shot.startMs)));
@@ -57,7 +63,11 @@ export function buildTimeline(plan: ReelPlan): Timeline {
   const transitions: TransitionWindow[] = [];
   plan.shots.forEach((shot, k) => {
     if (k === 0 || shot.transition !== 'crossfade') return;
-    const length = Math.min(CROSSFADE_FRAMES, at(shotFrameCounts, k - 1), at(shotFrameCounts, k));
+    const length = Math.min(
+      look.crossfadeFrames,
+      at(shotFrameCounts, k - 1),
+      at(shotFrameCounts, k),
+    );
     if (length < 2) return;
     transitions.push({
       shotIndex: k,
@@ -93,10 +103,13 @@ export function buildTimeline(plan: ReelPlan): Timeline {
       );
       if (window) {
         const incoming = window.shotIndex;
-        const alpha = (index - window.startFrame + 1) / (window.frameCount + 1);
+        const linear = (index - window.startFrame + 1) / (window.frameCount + 1);
+        const alpha =
+          look.crossfadeEasing === 'linear' ? linear : ease(look.crossfadeEasing, linear);
         return {
           index,
           timeMs,
+          sinceCut: index - at(shotStartFrames, incoming),
           layers: [
             { shotIndex: incoming - 1, progress: progressOf(incoming - 1, index), alpha: 1 },
             { shotIndex: incoming, progress: progressOf(incoming, index), alpha },
@@ -107,6 +120,7 @@ export function buildTimeline(plan: ReelPlan): Timeline {
       return {
         index,
         timeMs,
+        sinceCut: index - at(shotStartFrames, k),
         layers: [{ shotIndex: k, progress: progressOf(k, index), alpha: 1 }],
       };
     },

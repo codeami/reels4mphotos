@@ -6,6 +6,9 @@ export type Rect = { x: number; y: number; w: number; h: number };
 
 export type Transition = 'cut' | 'crossfade';
 
+/** The look a reel is cut and drawn in. Its numbers live in src/looks; a plan carries only the id. */
+export type LookId = 'classic' | 'zoom-punch' | 'flash-cut' | 'cinematic' | 'photo-dump';
+
 export interface ReelShot {
   /** Stable id the UI and render engine both use. */
   photoId: string;
@@ -14,9 +17,10 @@ export interface ReelShot {
   /** Transition INTO this shot. */
   transition: Transition;
   /**
-   * Crop windows the camera moves between. Each rect is a crop of the source
-   * photo whose pixel aspect is 9:16, so the renderer can draw it straight
-   * into the 1080x1920 frame without cover-fitting first.
+   * Crop windows the camera moves between. In a look that fills the frame (the default), each
+   * rect is a crop of the source photo whose pixel aspect is 9:16, so the renderer can draw it
+   * straight into the 1080x1920 frame without cover-fitting first. In a look that letterboxes or
+   * blur-fills, a rect may have any aspect and is fitted inside the frame instead.
    */
   kenBurns: { from: Rect; to: Rect };
 }
@@ -27,6 +31,8 @@ export interface ReelPlan {
   height: 1920;
   fps: 30;
   trackId: string;
+  /** Absent means 'classic', today's look, so plans made before looks existed still render. */
+  look?: LookId;
   totalMs: number;
   shots: ReelShot[];
 }

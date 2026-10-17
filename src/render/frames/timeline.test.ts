@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- the fixtures indexed here always exist */
 import { describe, expect, it } from 'vitest';
 import { CROSSFADE_FRAMES, FPS } from '../constants';
-import type { ReelPlan } from '../../types/reel-plan';
+import type { LookId, ReelPlan } from '../../types/reel-plan';
 import { buildFixtureReel } from '../testing/fixture-plan';
 import { buildTimeline } from './timeline';
 
@@ -145,5 +145,49 @@ describe('buildTimeline', () => {
       shots: plan.shots.map((s, k) => (k === 0 ? { ...s, transition: 'crossfade' } : s)),
     });
     expect(first.describeFrame(0).layers).toHaveLength(1);
+  });
+
+  it('puts the cut at sinceCut 0 and counts frames up from it', () => {
+    const k = 4;
+    const start = timeline.shotStartFrames[k]!;
+    expect(timeline.describeFrame(start).sinceCut).toBe(0);
+    expect(timeline.describeFrame(start + 5).sinceCut).toBe(5);
+    expect(timeline.describeFrame(start - 1).sinceCut).toBe(timeline.shotFrameCounts[k - 1]! - 1);
+    expect(timeline.describeFrame(0).sinceCut).toBe(0);
+  });
+
+  describe('crossfade length comes from the look', () => {
+    const fade = (look?: LookId): ReelPlan => ({
+      ...plan,
+      ...(look ? { look } : {}),
+      shots: plan.shots.map((s, k) => (k > 0 ? { ...s, transition: 'crossfade' as const } : s)),
+    });
+
+    it('is 10 frames for a plan with no look, as before looks existed', () => {
+      for (const w of buildTimeline(fade()).transitions)
+        expect(w.frameCount).toBe(CROSSFADE_FRAMES);
+    });
+
+    it('is 18 frames for cinematic, centred on the beat, with a smoothstep fade', () => {
+      const cinematic = buildTimeline(fade('cinematic'));
+      expect(cinematic.transitions.length).toBeGreaterThan(0);
+      for (const w of cinematic.transitions) {
+        expect(w.frameCount).toBe(18);
+        expect(w.startFrame + 9).toBe(cinematic.shotStartFrames[w.shotIndex]);
+      }
+      const w = cinematic.transitions[0]!;
+      const alphas = Array.from(
+        { length: w.frameCount },
+        (_, n) => cinematic.describeFrame(w.startFrame + n).layers[1]!.alpha,
+      );
+      expect([...alphas].sort((a, b) => a - b)).toEqual(alphas);
+      // smoothstep starts slower than linear
+      expect(alphas[0]!).toBeLessThan(1 / (w.frameCount + 1));
+      expect(alphas[alphas.length - 1]!).toBeLessThan(1);
+    });
+
+    it('drops the fade where the look has none', () => {
+      expect(buildTimeline(fade('zoom-punch')).transitions).toEqual([]);
+    });
   });
 });

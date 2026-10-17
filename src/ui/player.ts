@@ -1,10 +1,14 @@
+import { FPS } from '../render/constants';
+import { LookAssets } from '../render/frames/assets';
+import { drawFrame, type DecodedPhoto, type DrawSurface } from '../render/frames/draw';
+import { buildTimeline, type Timeline } from '../render/frames/timeline';
+import { at } from '../render/util';
 import type { ReelPlan } from './seams/types';
-import { crossfadeAlpha, rectAt, shotIndexAt } from './logic';
 
 /**
- * Plays a ReelPlan onto a canvas. It reads the same plan the render engine
- * consumes; the audio element is the clock while it plays, so cuts stay on the
- * track's beats. This is a preview, not the export path.
+ * Plays a ReelPlan onto a canvas. It draws each frame with the render engine's own drawFrame and
+ * timeline, at preview size, so a look previews the way it exports; the audio element is the clock
+ * while it plays, so cuts stay on the track's beats. This is a preview, not the export path.
  */
 export class Player {
   private raf = 0;
@@ -12,6 +16,8 @@ export class Player {
   private offsetMs = 0;
   private playing = false;
   private ctx: CanvasRenderingContext2D;
+  private readonly timeline: Timeline;
+  private readonly surface: DrawSurface;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -23,7 +29,10 @@ export class Player {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D is not available in this browser.');
     this.ctx = ctx;
+    this.timeline = buildTimeline(plan);
+    this.surface = { width: canvas.width, height: canvas.height, assets: new LookAssets() };
     this.seek(0);
+    this.drawPoster();
   }
 
   get isPlaying() {
@@ -88,35 +97,34 @@ export class Player {
     this.raf = requestAnimationFrame(this.loop);
   };
 
-  private drawShot(i: number, ms: number, alpha: number) {
-    const shot = this.plan.shots[i];
-    const bmp = shot && this.bitmaps.get(shot.photoId);
-    if (!bmp) return;
-    const t = (ms - shot.startMs) / shot.durationMs;
-    const r = rectAt(shot.kenBurns.from, shot.kenBurns.to, t);
-    this.ctx.globalAlpha = alpha;
-    this.ctx.drawImage(
-      bmp,
-      r.x * bmp.width,
-      r.y * bmp.height,
-      r.w * bmp.width,
-      r.h * bmp.height,
-      0,
-      0,
-      this.canvas.width,
-      this.canvas.height,
-    );
-    this.ctx.globalAlpha = 1;
+  /**
+   * Draws the frame a paused reel rests on: a little way into the second shot, so a flash or a
+   * punch has settled and the look can be judged without pressing Play. It touches no clock.
+   */
+  private drawPoster() {
+    const second = this.plan.shots[1];
+    this.draw(second ? Math.min(second.startMs + 400, this.plan.totalMs - 1) : 0);
   }
+
+  private photoFor = (shotIndex: number): DecodedPhoto => {
+    const bitmap = this.bitmaps.get(at(this.plan.shots, shotIndex).photoId);
+    if (!bitmap) throw new RangeError(`shot ${shotIndex} has no preview photo`);
+    return { image: bitmap, width: bitmap.width, height: bitmap.height };
+  };
 
   draw(ms: number) {
     if (!this.plan.shots.length) return;
-    this.ctx.fillStyle = '#000';
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    const i = shotIndexAt(this.plan, ms);
-    this.drawShot(i, ms, 1);
-    const current = this.plan.shots[i];
-    const fade = current ? crossfadeAlpha(current, ms) : 0;
-    if (fade > 0 && i > 0) this.drawShot(i - 1, ms, fade);
+    const frame = Math.min(
+      this.timeline.frameCount - 1,
+      Math.max(0, Math.floor((ms * FPS) / 1000)),
+    );
+    drawFrame(
+      this.ctx,
+      this.plan,
+      this.timeline.describeFrame(frame),
+      this.photoFor,
+      'medium',
+      this.surface,
+    );
   }
 }

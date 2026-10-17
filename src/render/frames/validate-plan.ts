@@ -1,5 +1,6 @@
 import { FPS, FRAME_HEIGHT, FRAME_WIDTH } from '../constants';
 import { RenderError } from '../errors';
+import { isLookId } from '../../looks';
 import type { Rect, ReelPlan } from '../../types/reel-plan';
 import { at } from '../util';
 
@@ -28,6 +29,9 @@ export function assertValidPlan(plan: ReelPlan): void {
   if (plan.version !== 1) invalid(`unsupported plan version ${String(plan.version)}`);
   if (plan.width !== FRAME_WIDTH || plan.height !== FRAME_HEIGHT || plan.fps !== FPS) {
     invalid(`plan must be ${FRAME_WIDTH}x${FRAME_HEIGHT} at ${FPS} fps`);
+  }
+  if (plan.look !== undefined && !isLookId(plan.look)) {
+    invalid(`unknown look "${String(plan.look)}"`);
   }
   if (!Number.isFinite(plan.totalMs) || plan.totalMs <= 0) invalid('plan has no duration');
   if (plan.shots.length === 0) invalid('plan has no shots');

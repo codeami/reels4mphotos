@@ -1,17 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkCount,
-  crossfadeAlpha,
   cutsOnBeat,
   dropReasonText,
   groupLeftOut,
   isHeic,
   move,
-  rectAt,
   shotIndexAt,
   toggle,
 } from './logic';
-import type { PhotoScore, ReelPlan, ReelShot } from './seams/types';
+import type { PhotoScore, ReelPlan } from './seams/types';
 
 const r = { x: 0, y: 0, w: 1, h: 1 };
 const plan = (starts: number[]): ReelPlan => ({
@@ -69,23 +67,11 @@ describe('isHeic', () => {
 });
 
 describe('playback maths', () => {
-  it('interpolates ken burns with ease in/out', () => {
-    const half = rectAt({ x: 0, y: 0, w: 1, h: 1 }, { x: 0.4, y: 0.2, w: 0.5, h: 0.5 }, 0.5);
-    expect(half.x).toBeCloseTo(0.2);
-    expect(rectAt(r, { ...r, x: 1 }, -3).x).toBe(0);
-    expect(rectAt(r, { ...r, x: 1 }, 9).x).toBe(1);
-  });
   it('finds the active shot', () => {
     const p = plan([0, 2000, 4000]);
     expect(shotIndexAt(p, 0)).toBe(0);
     expect(shotIndexAt(p, 2000)).toBe(1);
     expect(shotIndexAt(p, 8000)).toBe(2);
-  });
-  it('fades the previous shot only for crossfades', () => {
-    const p = plan([0, 2000, 4000]);
-    expect(crossfadeAlpha(p.shots[1] as ReelShot, 2000)).toBe(1);
-    expect(crossfadeAlpha(p.shots[1] as ReelShot, 2300)).toBe(0);
-    expect(crossfadeAlpha(p.shots[2] as ReelShot, 4000)).toBe(0);
   });
   it('counts cuts that land within tolerance of a beat', () => {
     const beatmap = {

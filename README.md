@@ -23,13 +23,16 @@ Someone with a camera roll full of trip / event photos who wants a reel to post 
 2. **Auto-select** — the app picks the best ~10 on-device: drops blurry, badly exposed and near-duplicate shots, keeps a spread across time. The user can toggle any photo in or out and drag to reorder.
 3. **Pick a beat** — one of 3 bundled royalty-free tracks, each with a pre-computed beat map.
 4. **Preview** — 1080×1920, 30 fps: Ken Burns pan/zoom on each photo, cuts land on beats, 2 transition styles. Target 15–30 s.
-5. **Export & share** — MP4 (H.264 + AAC) saved to the device or shared through the system share sheet.
+5. **Pick a look** — a row of chips under the preview: Classic, Zoom punch, Flash cut, Cinematic, Photo dump. Each cuts and draws the same photos its own way (see `docs/looks.md`). No text, no fonts, all drawn on the device.
+6. **Export & share** — MP4 (H.264 + AAC) saved to the device or shared through the system share sheet. Or tick **Export without music** for a video-only MP4 and add a song inside Instagram when you post; the cuts still follow the beat of the track you chose.
 
 Everything runs in the browser. No account, no server, no network after the page loads.
 
+Looks (the five chips above) and the silent export are in scope.
+
 ## Out of scope for MVP
 
-AI planner (Claude), captions/text overlays, trending audio, templates marketplace, video clips as input, accounts, cloud sync, the iOS native app, the messenger bundle.
+AI planner (Claude), captions/text overlays, trending audio (or any song list: the app never names or plays songs from Instagram), a templates marketplace, video clips as input, accounts, cloud sync, the iOS native app, the messenger bundle.
 
 ## Non-functional
 

@@ -3,6 +3,7 @@ import type { State } from '../store';
 
 export interface ExportActions {
   onStart: () => void;
+  onWithoutMusic: (on: boolean) => void;
   onShare: () => void;
   onSaved: () => void;
   onRestart: () => void;
@@ -85,6 +86,34 @@ function clearConfirm(a: ExportActions) {
   );
 }
 
+const ADD_SONG_LINE = 'Add a song inside Instagram when you post.';
+
+/** The cuts were timed to the chosen track's beats, music or not. Says which, in plain words. */
+function cutsFollowLine(s: State): string {
+  const track = s.track;
+  return track
+    ? `Cuts follow the beat of ${track.title} (${Math.round(track.beatmap.bpm)} BPM), so pick a song with a similar pace.`
+    : 'Cuts follow the beat of the track you chose.';
+}
+
+/** A tick box above the Export button: leave the music out and add a song in Instagram instead. */
+function withoutMusicOption(s: State, a: ExportActions) {
+  return h(
+    'label',
+    { class: 'no-music' },
+    h('input', {
+      type: 'checkbox',
+      'data-testid': 'no-music',
+      checked: s.withoutMusic,
+      onchange: (e: Event) => a.onWithoutMusic((e.target as HTMLInputElement).checked),
+    }),
+    h('span', { class: 'no-music-label' }, 'Export without music'),
+    h('p', { class: 'no-music-help', 'data-testid': 'no-music-help' }, ADD_SONG_LINE),
+    s.withoutMusic &&
+      h('p', { class: 'no-music-help', 'data-testid': 'cuts-follow' }, cutsFollowLine(s)),
+  );
+}
+
 export function exportScreen(s: State, a: ExportActions): HTMLElement {
   const e = s.exp;
   const head = [
@@ -123,12 +152,21 @@ export function exportScreen(s: State, a: ExportActions): HTMLElement {
     const canShare = a.canShare(e.file);
     body = [
       e.silent &&
-        h(
-          'div',
-          { class: 'hint', role: 'status', 'data-testid': 'silent-hint' },
-          h('strong', {}, 'This video has no sound. '),
-          'Add sound in Instagram: pick a track from its music library when you post.',
-        ),
+        (e.withoutMusic
+          ? h(
+              'div',
+              { class: 'hint', role: 'status', 'data-testid': 'silent-hint' },
+              h('strong', {}, 'No music in this video, as you asked. '),
+              ADD_SONG_LINE,
+              ' ',
+              cutsFollowLine(s),
+            )
+          : h(
+              'div',
+              { class: 'hint', role: 'status', 'data-testid': 'silent-hint' },
+              h('strong', {}, 'This video has no sound. '),
+              'Add sound in Instagram: pick a track from its music library when you post.',
+            )),
       h('p', { class: 'lede' }, `${e.file.name} · ${(e.file.size / 1048576).toFixed(1)} MB`),
       h(
         'button',
@@ -185,6 +223,7 @@ export function exportScreen(s: State, a: ExportActions): HTMLElement {
         { class: 'lede' },
         `${s.order.length} photos · ${(s.plan ? s.plan.totalMs / 1000 : 0).toFixed(0)} seconds · 9:16`,
       ),
+      withoutMusicOption(s, a),
       h(
         'button',
         { class: 'btn btn-primary', type: 'button', 'data-testid': 'export', onclick: a.onStart },
