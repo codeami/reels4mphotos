@@ -2,14 +2,14 @@
 // workstreams so the UI runs and tests before they land. They contain no real
 // curation or encoding logic and must never ship as the real thing: the UI
 // shows a "demo engine" badge whenever any of this is in use.
+// The plan is the one exception: it comes from the real planner, because the preview now draws
+// frames with the real renderer and that refuses a plan that does not add up.
+import { buildPlan } from '../../curation/plan';
 import type {
   BeatMap,
   Engines,
   LoadedTrack,
   PhotoScore,
-  PlanPhoto,
-  ReelPlan,
-  ReelShot,
   SelectOptions,
   Selection,
   Track,
@@ -73,40 +73,17 @@ const REASONS = [
   'overexposed',
 ] as const;
 
-function buildPlan(
-  order: PlanPhoto[],
-  beatmap: BeatMap,
-  targetMs = 20_000,
-  transitionOffset = 0,
-): ReelPlan {
-  const beats = beatmap.beatsMs;
-  // Cuts land exactly on beat times; a longer target spaces them wider.
-  const shotMs = Math.max(500, targetMs / Math.max(1, order.length));
-  const stride = Math.max(2, Math.round(shotMs / ((beats[1] ?? 500) - (beats[0] ?? 0))));
-  const shots: ReelShot[] = order.map((p, i) => {
-    const startMs = beats[Math.min(i * stride, beats.length - 1)] ?? 0;
-    const endMs = beats[Math.min((i + 1) * stride, beats.length - 1)] ?? startMs;
-    const zoomIn = i % 2 === 0;
-    const wide = { x: 0.1, y: 0.05, w: 0.8, h: 0.9 };
-    const tight = { x: 0.25, y: 0.2, w: 0.5, h: 0.6 };
-    return {
-      photoId: p.photoId,
-      startMs,
-      durationMs: Math.max(500, endMs - startMs),
-      transition: (i + transitionOffset) % 3 === 2 ? 'crossfade' : 'cut',
-      kenBurns: zoomIn ? { from: wide, to: tight } : { from: tight, to: wide },
-    };
-  });
-  const last = shots[shots.length - 1];
-  return {
-    version: 1,
-    width: 1080,
-    height: 1920,
-    fps: 30,
-    trackId: beatmap.trackId,
-    totalMs: last ? last.startMs + last.durationMs : 0,
-    shots,
-  };
+const realSizes = new Map<string, { width: number; height: number }>();
+
+async function sizeOf(file: File): Promise<{ width: number; height: number } | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const size = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return size;
+  } catch {
+    return null;
+  }
 }
 
 async function fakeSelect(files: File[], opts: SelectOptions): Promise<Selection> {
@@ -123,6 +100,13 @@ async function fakeSelect(files: File[], opts: SelectOptions): Promise<Selection
     ranked.slice(target).map((s, i) => [s.index, REASONS[i % REASONS.length] ?? 'not-selected']),
   );
   const winner = ranked[0]?.photoId;
+  // The scores keep their invented 400x600, but the preview now draws with the real renderer,
+  // which checks crops against a photo's true shape, so the plan below is cut on the real size.
+  const sizes = await Promise.all(files.map(sizeOf));
+  scored.forEach((s, i) => {
+    const size = sizes[i];
+    if (size) realSizes.set(s.photoId, size);
+  });
   const scores: PhotoScore[] = scored.map((s) => {
     const dropReason = dropped.get(s.index) ?? null;
     return {
@@ -145,7 +129,14 @@ export function fakeEngines(): Engines {
   return {
     fake: true,
     select: fakeSelect,
-    plan: buildPlan,
+    plan: (photos, beatmap, targetMs, offset, look) =>
+      buildPlan(
+        photos.map((p) => ({ ...p, ...realSizes.get(p.photoId) })),
+        beatmap,
+        targetMs,
+        offset,
+        look,
+      ),
     tracks: FAKE_TRACKS,
     async loadTrack(id): Promise<LoadedTrack> {
       const t = FAKE_TRACKS.find((x) => x.id === id);
@@ -159,14 +150,14 @@ export function fakeEngines(): Engines {
         audioUrl: clickWav(beatmap.beatsMs, TRACK_MS),
       };
     },
-    async render(_plan, _photos, _beatmap, onProgress) {
+    async render(_plan, _photos, _beatmap, onProgress, _bytes, choices) {
       for (let i = 1; i <= 10; i++) {
         await new Promise((r) => setTimeout(r, 120));
         onProgress(i / 10);
       }
       // Not a playable MP4: a labelled placeholder so share/download can run.
       const blob = new Blob([new Uint8Array(2048)], { type: 'video/mp4' });
-      return { blob, silent: params.get('silent') === '1' };
+      return { blob, silent: choices?.withoutMusic === true || params.get('silent') === '1' };
     },
   };
 }

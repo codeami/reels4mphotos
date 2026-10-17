@@ -145,3 +145,101 @@ describe('kenBurnsFor', () => {
     }
   });
 });
+
+describe('buildPlan with a look', () => {
+  const beatmap = syntheticBeatMap(120, 60_000); // a beat every 500 ms
+  const onBeat = (ms: number) => beatmap.beatsMs.includes(ms);
+
+  it('leaves a classic plan as it was: no look id, shots as before', () => {
+    const plain = buildPlan(chosen(10), beatmap, 20_000);
+    expect(plain).not.toHaveProperty('look');
+    expect(buildPlan(chosen(10), beatmap, 20_000, 0, 'classic')).toEqual(plain);
+  });
+
+  it('writes the look id into the plan for any other look', () => {
+    expect(buildPlan(chosen(10), beatmap, 20_000, 0, 'cinematic').look).toBe('cinematic');
+  });
+
+  it('cuts zoom-punch and flash-cut on every beat, going round the photos again to fill the length', () => {
+    for (const look of ['zoom-punch', 'flash-cut'] as const) {
+      const plan = buildPlan(chosen(10), beatmap, 20_000, 0, look);
+      expect(plan.shots.length).toBeGreaterThan(10);
+      expect(plan.shots.length).toBeLessThanOrEqual(30);
+      expect(plan.shots.every((s) => s.durationMs === 500)).toBe(true);
+      expect(plan.shots.every((s) => onBeat(s.startMs))).toBe(true);
+      expect(plan.shots.map((s) => s.photoId).slice(0, 12)).toEqual([
+        ...chosen(10).map((c) => c.photoId),
+        'p0',
+        'p1',
+      ]);
+      expect(plan.shots.every((s) => s.transition === 'cut')).toBe(true);
+    }
+  });
+
+  it('keeps contiguous shots that end exactly at totalMs', () => {
+    for (const look of ['zoom-punch', 'cinematic', 'photo-dump'] as const) {
+      const plan = buildPlan(chosen(10), beatmap, 20_000, 0, look);
+      let cursor = 0;
+      for (const s of plan.shots) {
+        expect(s.startMs).toBe(cursor);
+        cursor += s.durationMs;
+      }
+      expect(plan.totalMs).toBe(cursor);
+    }
+  });
+
+  it('cuts photo-dump in one and two beats', () => {
+    const plan = buildPlan(chosen(10), beatmap, 20_000, 0, 'photo-dump');
+    const beats = new Set(plan.shots.map((s) => s.durationMs / 500));
+    expect([...beats].sort()).toEqual([1, 2]);
+    expect(plan.shots.every((s) => onBeat(s.startMs))).toBe(true);
+  });
+
+  it('cuts cinematic in four to eight beats and fades every shot in', () => {
+    const plan = buildPlan(chosen(10), beatmap, 20_000, 0, 'cinematic');
+    expect(plan.shots).toHaveLength(10);
+    for (const s of plan.shots) {
+      expect(s.durationMs / 500).toBeGreaterThanOrEqual(4);
+      expect(s.durationMs / 500).toBeLessThanOrEqual(8);
+    }
+    expect(plan.shots.map((s) => s.transition)).toEqual(['cut', ...Array(9).fill('crossfade')]);
+    expect(plan.totalMs).toBeGreaterThanOrEqual(15_000);
+    expect(plan.totalMs).toBeLessThanOrEqual(30_000);
+  });
+
+  it('shortens cinematic cuts below four beats rather than drop photos when the beats run out', () => {
+    const slow = syntheticBeatMap(60, 30_000); // 30 beats for 10 photos
+    const plan = buildPlan(chosen(10), slow, 30_000, 0, 'cinematic');
+    expect(plan.shots).toHaveLength(10);
+    expect(plan.totalMs).toBeLessThanOrEqual(30_000);
+  });
+
+  it('falls back to even cuts when the beat map is too sparse for beat counting', () => {
+    const sparse = { ...beatmap, beatsMs: [0, 4000, 9000] };
+    const plan = buildPlan(chosen(10), sparse, 20_000, 0, 'zoom-punch');
+    expect(plan.shots).toHaveLength(10);
+  });
+
+  it('moves over the whole photo when the look fits it inside the frame', () => {
+    const plan = buildPlan(chosen(4), beatmap, 20_000, 0, 'zoom-punch');
+    const first = must(plan.shots[0]);
+    // the whole 4:3 photo is the widest crop, so a zoomed window keeps the photo's own aspect
+    for (const r of [first.kenBurns.from, first.kenBurns.to]) {
+      expect((r.w * 4000) / (r.h * 3000)).toBeCloseTo(4 / 3, 6);
+    }
+    expect(Math.max(first.kenBurns.from.w, first.kenBurns.to.w)).toBeCloseTo(1, 6);
+  });
+
+  it('gives a look its own Ken Burns zoom', () => {
+    const slow = kenBurnsFor(1, 4000, 3000, { fit: 'contain', zoom: 1.1 });
+    expect(slow.from.w).toBeCloseTo(1 / 1.1, 9);
+    const still = kenBurnsFor(1, 4000, 3000, { fit: 'contain', zoom: 1 });
+    expect(still.from).toEqual({ x: 0, y: 0, w: 1, h: 1 });
+  });
+
+  it('is deterministic', () => {
+    expect(buildPlan(chosen(10), beatmap, 20_000, 0, 'photo-dump')).toEqual(
+      buildPlan(chosen(10), beatmap, 20_000, 0, 'photo-dump'),
+    );
+  });
+});

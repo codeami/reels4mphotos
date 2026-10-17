@@ -1,5 +1,5 @@
 import type { DropReason } from '../curation/types';
-import type { BeatMap, PhotoScore, Rect, ReelPlan, ReelShot } from './seams/types';
+import type { BeatMap, PhotoScore, ReelPlan } from './seams/types';
 
 export const MIN_PHOTOS = 5;
 export const MAX_PHOTOS = 50;
@@ -100,33 +100,11 @@ export const DEFAULT_LENGTH_MS = 20_000;
 
 export const isHeic = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const ease = (t: number) => t * t * (3 - 2 * t);
-
-export function rectAt(from: Rect, to: Rect, t: number): Rect {
-  const e = ease(Math.min(1, Math.max(0, t)));
-  return {
-    x: lerp(from.x, to.x, e),
-    y: lerp(from.y, to.y, e),
-    w: lerp(from.w, to.w, e),
-    h: lerp(from.h, to.h, e),
-  };
-}
-
 export function shotIndexAt(plan: ReelPlan, ms: number): number {
   let idx = 0;
   for (let i = 0; i < plan.shots.length; i++)
     if ((plan.shots[i]?.startMs ?? Infinity) <= ms) idx = i;
   return idx;
-}
-
-export const CROSSFADE_MS = 300;
-
-/** Alpha of the previous shot while a crossfade into `shot` is running. */
-export function crossfadeAlpha(shot: ReelShot, ms: number): number {
-  if (shot.transition !== 'crossfade') return 0;
-  const into = ms - shot.startMs;
-  return into >= CROSSFADE_MS ? 0 : 1 - into / CROSSFADE_MS;
 }
 
 /** How many shot boundaries fall within tolerance of a beat. */

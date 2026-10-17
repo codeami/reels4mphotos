@@ -1,7 +1,8 @@
 import { DEFAULT_LENGTH_MS } from './logic';
 import type { Staged } from './staging';
 import { initialRating, type RatingState } from './rating';
-import type { Engines, LoadedTrack, PhotoScore, ReelPlan } from './seams/types';
+import { DEFAULT_LOOK } from '../looks';
+import type { Engines, LoadedTrack, LookId, PhotoScore, ReelPlan } from './seams/types';
 
 // `pick` and `track` are the Customize screens (Photos, Music), reached from the preview.
 export type Step = 'add' | 'review' | 'preview' | 'pick' | 'track' | 'export';
@@ -23,7 +24,14 @@ export interface Skipped {
 export type ExportState =
   | { kind: 'idle' }
   | { kind: 'rendering'; progress: number }
-  | { kind: 'done'; file: File; silent: boolean; url: string; saved: boolean }
+  | {
+      kind: 'done';
+      file: File;
+      silent: boolean;
+      withoutMusic: boolean;
+      url: string;
+      saved: boolean;
+    }
   | { kind: 'error'; message: string }
   | { kind: 'cleared' };
 
@@ -40,6 +48,8 @@ export interface State {
   trackId: string | null;
   track: LoadedTrack | null;
   lengthMs: number; // target reel length; the plan clamps it to what the track can carry
+  look: LookId; // how the reel is cut and drawn; written into the plan and used by the export
+  withoutMusic: boolean; // export the video with no music, to add a song inside Instagram
   exp: ExportState;
   rating: RatingState;
   confirmClear: boolean; // the "clear app copies" question is open
@@ -59,6 +69,8 @@ export const initialState = (): State => ({
   trackId: null,
   track: null,
   lengthMs: DEFAULT_LENGTH_MS,
+  look: DEFAULT_LOOK,
+  withoutMusic: false,
   exp: { kind: 'idle' },
   rating: initialRating(),
   confirmClear: false,

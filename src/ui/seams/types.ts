@@ -1,25 +1,5 @@
-// LOCAL COPY of the shared seams so this branch builds before the sibling
-// workstreams land. At merge, replace the ReelPlan block with
-//   export type { Rect, Transition, ReelShot, ReelPlan } from '../../types/reel-plan';
-// (owned by the curation workstream). The shapes below are the agreed ones.
-export type Rect = { x: number; y: number; w: number; h: number };
-export type Transition = 'cut' | 'crossfade';
-export interface ReelShot {
-  photoId: string;
-  startMs: number;
-  durationMs: number;
-  transition: Transition;
-  kenBurns: { from: Rect; to: Rect };
-}
-export interface ReelPlan {
-  version: 1;
-  width: 1080;
-  height: 1920;
-  fps: 30;
-  trackId: string;
-  totalMs: number;
-  shots: ReelShot[];
-}
+export type { Rect, Transition, LookId, ReelShot, ReelPlan } from '../../types/reel-plan';
+import type { LookId, ReelPlan } from '../../types/reel-plan';
 
 export interface BeatMap {
   version: 1;
@@ -47,6 +27,12 @@ export interface LoadedTrack extends Track {
   beatmap: BeatMap;
 }
 
+/** What the user chose on the export screen. */
+export interface RenderChoices {
+  /** Export the video with no music, so a song can be added inside Instagram. */
+  withoutMusic?: boolean;
+}
+
 export interface RenderOutcome {
   blob: Blob;
   silent: boolean; // render engine produced video without an audio track
@@ -61,6 +47,7 @@ export interface Engines {
     beatmap: BeatMap,
     targetMs?: number,
     transitionOffset?: number,
+    look?: LookId,
   ): ReelPlan;
   render(
     plan: ReelPlan,
@@ -69,6 +56,7 @@ export interface Engines {
     onProgress: (p: number) => void,
     /** The music track's bytes, when the caller holds them, so the renderer fetches nothing. */
     trackBytes?: ArrayBuffer,
+    options?: RenderChoices,
   ): Promise<RenderOutcome>;
   /** Best-effort background preparation (worker, capability probe) so an export makes no request. */
   warmUp?(): Promise<void>;

@@ -968,3 +968,67 @@ h3 {
   background: var(--safelight);
   color: var(--safelight-ink);
 }
+
+/* looks: a row of chips under the playing reel */
+.looks {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.looks h3 {
+  font: 600 0.75rem/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+}
+.look-row {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  scrollbar-width: none;
+}
+.look-chip {
+  flex: none;
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border: 1.5px solid var(--line);
+  background: transparent;
+  color: var(--paper);
+  font: 600 0.9375rem var(--font-body);
+  cursor: pointer;
+}
+.look-chip.is-on {
+  border-color: var(--safelight);
+  background: var(--safelight);
+  color: var(--safelight-ink);
+}
+
+/* export without music */
+.no-music {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  align-items: start;
+  min-height: var(--tap);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  background: var(--film);
+  cursor: pointer;
+}
+.no-music input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0.15rem 0 0;
+  accent-color: var(--safelight);
+}
+.no-music-label {
+  font-weight: 600;
+}
+.no-music-help {
+  grid-column: 2;
+  margin: 0;
+  color: var(--paper-dim);
+  font-size: 0.875rem;
+}

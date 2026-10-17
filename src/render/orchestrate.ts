@@ -29,6 +29,9 @@ export interface RenderOptions {
   trackBytes?: ArrayBuffer;
   // Run only this path and fail rather than fall back. For tests and diagnostics.
   forcePath?: RenderPathId;
+  // The user asked for a video with no music (to add a song inside Instagram). Exports the video
+  // track only: the cuts still follow the beat map, but no track is fetched, decoded or encoded.
+  withoutMusic?: boolean;
 }
 
 export interface RenderResult {
@@ -108,6 +111,14 @@ export async function orchestrate(
     }
     candidates = [forced];
   }
+  if (options.withoutMusic) {
+    // Only the WebCodecs video-only path can leave the music out; MediaRecorder always records it.
+    if (!candidates.includes('silent')) {
+      const why = skipped.find((s) => s.path === 'silent')?.reason ?? 'not viable on this device';
+      throw new RenderError('unsupported', `this browser cannot export without music: ${why}`);
+    }
+    candidates = ['silent'];
+  }
   if (candidates.length === 0) {
     throw new RenderError(
       'unsupported',
@@ -182,8 +193,9 @@ export async function orchestrate(
     height: 1920,
     fps: 30,
     frameCount: output.frameCount,
+    // Silence the user asked for is not a fallback, so it comes with no excuse.
     silentHint:
-      ran === 'silent'
+      ran === 'silent' && !options.withoutMusic
         ? silentHintFor([
             ...skipped.map((s) => `${s.path}: ${s.reason}`),
             ...failedAttempts.map((a) => `${a.path}: ${a.error}`),

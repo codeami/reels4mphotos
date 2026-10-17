@@ -1,7 +1,8 @@
 import { FPS, FRAME_HEIGHT, FRAME_WIDTH } from '../constants';
 import type { ReelPlan } from '../../types/reel-plan';
+import { LookAssets } from './assets';
 import { getRenderContext, type RenderCanvas, type RenderContext } from './canvas';
-import { drawFrame } from './draw';
+import { drawFrame, type DrawSurface } from './draw';
 import type { DecodedPhoto } from './draw';
 import type { PhotoProvider } from './photo-store';
 import { buildTimeline, type Timeline } from './timeline';
@@ -14,6 +15,11 @@ export class FrameGenerator {
   readonly frameCount: number;
   readonly fps = FPS;
   private readonly ctx: RenderContext;
+  private readonly surface: DrawSurface = {
+    width: FRAME_WIDTH,
+    height: FRAME_HEIGHT,
+    assets: new LookAssets(),
+  };
 
   constructor(
     private readonly plan: ReelPlan,
@@ -47,6 +53,7 @@ export class FrameGenerator {
         return photo;
       },
       this.smoothing,
+      this.surface,
     );
   }
 

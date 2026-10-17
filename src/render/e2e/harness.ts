@@ -15,7 +15,8 @@ import {
   type RenderPathId,
 } from '../probe';
 import type { RenderReport } from '../report';
-import type { ReelPlan } from '../../types/reel-plan';
+import { LOOK_ORDER } from '../../looks';
+import type { LookId, ReelPlan } from '../../types/reel-plan';
 import { GATE_TRACK_ID, buildHarnessReel, harnessPhotoSize } from './harness-reel';
 
 export interface HarnessRun {
@@ -33,6 +34,23 @@ export interface HarnessRunOptions {
   // Keep only the first N shots of the 10-shot, ~20 s plan curation builds. Default: all ten.
   shotCount?: number;
   forcePath?: RenderPathId;
+  // The look to cut and draw in; default classic.
+  look?: LookId;
+  // Export the video with no music.
+  withoutMusic?: boolean;
+}
+
+export interface LookTiming {
+  look: LookId;
+  frames: number;
+  // Milliseconds to draw one frame at 1080x1920 and hand it to the encoder as a VideoFrame.
+  medianMs: number;
+  p95Ms: number;
+  maxMs: number;
+  // The same without the VideoFrame hand-over: pure canvas work, which a GPU may finish later.
+  drawOnlyMedianMs: number;
+  // Frames that began a shot (a new photo is decoded there) against all other frames.
+  shotStartMedianMs: number;
 }
 
 export interface EncodedFrameCheck {
@@ -101,6 +119,33 @@ async function makePhoto(index: number): Promise<Blob> {
   return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.9 });
 }
 
+// A photo the size the app hands the renderer: decodePhoto caps the long edge at MAX_PHOTO_LONG_EDGE.
+async function makeBenchPhoto(index: number): Promise<Blob> {
+  const landscape = index % 2 === 0;
+  const width = landscape ? 3072 : 2304;
+  const height = landscape ? 2304 : 3072;
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2d context unavailable');
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, `hsl(${(index * 36) % 360} 70% 35%)`);
+  gradient.addColorStop(1, `hsl(${(index * 36 + 60) % 360} 80% 65%)`);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  for (let n = 0; n < 40; n++) {
+    ctx.beginPath();
+    ctx.arc((n * 137) % width, (n * 251) % height, 60 + (n % 5) * 30, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.9 });
+}
+
+function percentile(values: number[], p: number): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? 0;
+}
+
 async function makePhotos(plan: ReelPlan): Promise<Map<string, Blob>> {
   const entries = await Promise.all(
     plan.shots.map(async (shot, k) => [shot.photoId, await makePhoto(k)] as const),
@@ -139,8 +184,37 @@ async function sha256(bytes: Uint8ClampedArray): Promise<string> {
 
 export const harness = {
   // The plan (and beat map) a run with these options would render.
-  async reel(trackId?: string, shotCount?: number): Promise<{ plan: ReelPlan; beatmap: BeatMap }> {
-    return buildHarnessReel(trackId, shotCount);
+  async reel(
+    trackId?: string,
+    shotCount?: number,
+    look?: LookId,
+  ): Promise<{ plan: ReelPlan; beatmap: BeatMap }> {
+    return buildHarnessReel(trackId, shotCount, look);
+  },
+
+  // One frame of each look, twice from independent generators: a look is a pure function of the frame.
+  async lookFrameHashes(
+    index: number,
+  ): Promise<{ first: Record<string, string>; second: Record<string, string> }> {
+    const hashAll = async (): Promise<Record<string, string>> => {
+      const out: Record<string, string> = {};
+      for (const look of LOOK_ORDER) {
+        const { plan } = await buildHarnessReel(GATE_TRACK_ID, 8, look);
+        const photos = await makePhotos(plan);
+        const generator = new FrameGenerator(
+          plan,
+          new PhotoStore(photos),
+          createRenderCanvas('offscreen'),
+        );
+        try {
+          out[look] = await sha256(await generator.renderRgba(index));
+        } finally {
+          generator.dispose();
+        }
+      }
+      return out;
+    };
+    return { first: await hashAll(), second: await hashAll() };
   },
 
   // Decodes a bundled track the way the export does, and reports what came out.
@@ -179,7 +253,11 @@ export const harness = {
   },
 
   async run(options: HarnessRunOptions = {}): Promise<HarnessRun> {
-    const { plan, beatmap } = await buildHarnessReel(options.trackId, options.shotCount);
+    const { plan, beatmap } = await buildHarnessReel(
+      options.trackId,
+      options.shotCount,
+      options.look,
+    );
     const photos = await makePhotos(plan);
     const progress: number[] = [];
     const started = performance.now();
@@ -190,6 +268,7 @@ export const harness = {
       (p) => progress.push(p),
       {
         forcePath: options.forcePath,
+        withoutMusic: options.withoutMusic,
       },
     );
     const wallMs = performance.now() - started;
@@ -201,6 +280,57 @@ export const harness = {
       progress,
       wallMs,
     };
+  },
+
+  // Per-frame render time of every look, with photos the size the app decodes (3072 px long edge).
+  // Frames are drawn in order through the export's own FrameGenerator, and each is handed to a
+  // VideoFrame the way the encoder path does, which waits for the pixels to exist.
+  async benchLooks(frameCount = 300): Promise<LookTiming[]> {
+    const timings: LookTiming[] = [];
+    for (const look of LOOK_ORDER) {
+      const { plan } = await buildHarnessReel(GATE_TRACK_ID, 40, look);
+      const photos = new Map<string, Blob>();
+      for (const shot of plan.shots) {
+        if (!photos.has(shot.photoId)) photos.set(shot.photoId, await makeBenchPhoto(photos.size));
+      }
+      const generator = new FrameGenerator(
+        plan,
+        new PhotoStore(photos),
+        createRenderCanvas('offscreen'),
+      );
+      const total = Math.min(frameCount, generator.frameCount);
+      const starts = new Set(generator.timeline.shotStartFrames);
+      const drawOnly: number[] = [];
+      const full: number[] = [];
+      const atShotStart: number[] = [];
+      try {
+        // one untimed pass over a few frames warms the canvas and the first decode
+        await generator.drawFrame(0);
+        for (let i = 0; i < total; i++) {
+          const t0 = performance.now();
+          await generator.drawFrame(i);
+          const t1 = performance.now();
+          const frame = new VideoFrame(generator.canvas, { timestamp: i * 33_333 });
+          frame.close();
+          const t2 = performance.now();
+          drawOnly.push(t1 - t0);
+          full.push(t2 - t0);
+          if (starts.has(i)) atShotStart.push(t2 - t0);
+        }
+      } finally {
+        generator.dispose();
+      }
+      timings.push({
+        look,
+        frames: total,
+        medianMs: percentile(full, 0.5),
+        p95Ms: percentile(full, 0.95),
+        maxMs: Math.max(...full),
+        drawOnlyMedianMs: percentile(drawOnly, 0.5),
+        shotStartMedianMs: percentile(atShotStart, 0.5),
+      });
+    }
+    return timings;
   },
 
   // Hashes the RGBA of the given frames from two independent generators.
