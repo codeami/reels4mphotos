@@ -59,8 +59,9 @@ async function exportFixture(page: Page, name: string, options: HarnessRunOption
   return { run, bytes, meta: await readMp4Metadata(new Uint8Array(bytes)) };
 }
 
-// Four shots (about 8 s): enough to show a path works without a full-length render.
-const SHORT = { shotCount: 4 };
+// Five shots (about 10 s): enough to show a path works without a full-length render, and the
+// five different photos the classic look needs (a trimmed plan keeps one photo per shot).
+const SHORT = { shotCount: 5 };
 
 test('exports a 1080x1920, 30 fps, 15-30 s MP4 with audio', async ({ page }, testInfo) => {
   await openHarness(page);

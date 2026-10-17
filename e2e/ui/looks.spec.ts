@@ -16,11 +16,27 @@ test.beforeEach(async ({ page }) => {
   await expect(watchIt(page)).toBeVisible();
 });
 
-test('five look chips under the reel, Classic first and chosen, in plain words', async ({
+test('eight look chips under the reel, Classic first and chosen, the last three marked for one photo', async ({
   page,
 }) => {
-  const chips = page.getByTestId('looks').getByRole('button');
-  await expect(chips).toHaveText(['Classic', 'Zoom punch', 'Flash cut', 'Cinematic', 'Photo dump']);
+  const names = page.getByTestId('looks').locator('.look-name');
+  await expect(names).toHaveText([
+    'Classic',
+    'Zoom punch',
+    'Flash cut',
+    'Cinematic',
+    'Photo dump',
+    'Neon edge',
+    'Zoom through',
+    'Glitch slice',
+  ]);
+  // with ten photos every look can be used; only the last three say they also work with one
+  await expect(page.getByTestId('looks').locator('.look-tag')).toHaveText([
+    'works with one photo',
+    'works with one photo',
+    'works with one photo',
+  ]);
+  await expect(page.getByTestId('looks').getByRole('button', { disabled: true })).toHaveCount(0);
   await expect(page.getByTestId('look-classic')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('look-blurb')).toContainText('Soft fades');
 });

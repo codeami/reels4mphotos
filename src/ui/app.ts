@@ -2,7 +2,7 @@ import { adviceFor, analyseSet } from '../curation/advice';
 import { rerollReel } from '../curation/reroll';
 import { h } from './dom';
 import { intake } from './intake';
-import { checkCount, MIN_PHOTOS, move, toggle } from './logic';
+import { checkCount, FEWEST_PHOTOS, move, toggle } from './logic';
 import { decideRating, initialRating, NOTES, rerollPool } from './rating';
 import { enableDragReorder } from './reorder';
 import { addScreen, skippedChips } from './screens/add';
@@ -17,7 +17,7 @@ import { ratingBlock } from './screens/rating';
 import { stopSample, trackScreen } from './screens/track';
 import type { Engines, LookId } from './seams/types';
 import { createThumbs, keptFiles, stage, toggleKept } from './staging';
-import { LOOKS } from '../looks';
+import { LOOKS, lookForPhotoCount, minPhotosOf } from '../looks';
 import { createStore, stageOf, STEPS, type Photo, type State } from './store';
 
 const TITLES: Record<(typeof STEPS)[number], string> = {
@@ -85,7 +85,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
 
   async function handleFiles(picked: File[]) {
     if (picked.length === 0) return;
-    const count = checkCount(picked.length);
+    const count = checkCount(picked.length, FEWEST_PHOTOS);
     if (!count.ok) {
       store.set({ notice: count.message, skipped: [] });
       return;
@@ -94,7 +94,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
     thumbs.release();
     store.set({ staged: [], step: 'add', busy: 'Checking photos…', notice: null, skipped: [] });
     const { files, skipped } = await intake(picked);
-    const after = checkCount(files.length);
+    const after = checkCount(files.length, FEWEST_PHOTOS);
     if (!after.ok) {
       store.set({
         busy: null,
@@ -114,7 +114,10 @@ export function createApp(root: HTMLElement, engines: Engines) {
         })
         .sort((x, y) => x.score.index - y.score.index);
       const order = result.chosen.map((x) => x.photoId);
+      // Fewer photos than the chosen look needs (five for most): switch to one that works with them.
+      const look = lookForPhotoCount(store.get().look, order.length);
       store.set({
+        look,
         busy: 'Cutting your reel…',
         files,
         photos,
@@ -126,7 +129,9 @@ export function createApp(root: HTMLElement, engines: Engines) {
         exp: { kind: 'idle' },
         rating: initialRating(),
         confirmClear: false,
-        announce: `${order.length} of ${photos.length} photos chosen.`,
+        announce:
+          `${order.length} of ${photos.length} photos chosen.` +
+          (look === store.get().look ? '' : ` ${LOOKS[look].name} works with this few.`),
       });
       await openWithDefaultTrack();
     } catch (err) {
@@ -416,14 +421,20 @@ export function createApp(root: HTMLElement, engines: Engines) {
           primary(
             `Done · ${kept}`,
             () => void handleFiles(keptFiles(s.staged)),
-            !checkCount(kept).ok || busy,
+            !checkCount(kept, FEWEST_PHOTOS).ok || busy,
           ),
         ];
       }
       case 'preview':
         return [ghost('New photos', 'add'), primary('Export', () => goto('export'), busy)];
       case 'pick':
-        return [primary('Done', () => void goPreview(), s.order.length < MIN_PHOTOS || busy)];
+        return [
+          primary(
+            'Done',
+            () => void goPreview(),
+            s.order.length < minPhotosOf(LOOKS[s.look]) || busy,
+          ),
+        ];
       case 'track':
         return [primary('Done', () => void goPreview(), !s.track || busy)];
       case 'export':
@@ -449,7 +460,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
       case 'preview': {
         if (!s.plan || !s.track) return h('section', { class: 'screen' });
         ratingEl = ratingBlock(s.rating, { onRate: rate });
-        looksEl = looksRow(s.look, { onLook: setLook });
+        looksEl = looksRow(s.look, { onLook: setLook }, s.order.length);
         preview = previewScreen(s.plan, bitmaps, s.track.audioUrl, s.track.beatmap, [
           looksEl,
           ratingEl,
@@ -509,7 +520,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
     }
     if (keepPreview && looksEl) {
       // The chip you tapped lights up at once, while the new cut is still being built.
-      const next = looksRow(s.look, { onLook: setLook });
+      const next = looksRow(s.look, { onLook: setLook }, s.order.length);
       looksEl.replaceWith(next);
       looksEl = next;
     }

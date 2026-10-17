@@ -999,10 +999,27 @@ h3 {
   font: 600 0.9375rem var(--font-body);
   cursor: pointer;
 }
+.look-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.125rem;
+  padding-block: var(--space-2);
+  text-align: left;
+}
 .look-chip.is-on {
   border-color: var(--safelight);
   background: var(--safelight);
   color: var(--safelight-ink);
+}
+.look-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.look-tag {
+  font: 500 0.6875rem/1.2 var(--font-body);
+  opacity: 0.8;
 }
 
 /* export without music */

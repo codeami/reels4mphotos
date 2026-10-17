@@ -29,13 +29,13 @@ export function backdropKey(photoId: string, kind: BackdropKind): string {
 }
 
 // Least recently used, bounded: ten shots never keep more than a few small canvases alive.
-export class BackdropCache {
-  private readonly entries = new Map<string, RenderCanvas>();
+export class LruCache<T> {
+  private readonly entries = new Map<string, T>();
   builds = 0;
 
   constructor(private readonly capacity = 8) {}
 
-  get(key: string, build: () => RenderCanvas): RenderCanvas {
+  get(key: string, build: () => T): T {
     const hit = this.entries.get(key);
     if (hit) {
       this.entries.delete(key);
@@ -56,6 +56,8 @@ export class BackdropCache {
     return this.entries.size;
   }
 }
+
+export class BackdropCache extends LruCache<RenderCanvas> {}
 
 function contextOf(canvas: RenderCanvas): RenderContext {
   const ctx = canvas.getContext('2d') as RenderContext | null;

@@ -1,7 +1,11 @@
 import type { DropReason } from '../curation/types';
 import type { BeatMap, PhotoScore, ReelPlan } from './seams/types';
 
-export const MIN_PHOTOS = 5;
+import { DEFAULT_MIN_PHOTOS, FEWEST_PHOTOS } from '../looks';
+
+// Most looks need five photos; the single-photo looks need FEWEST_PHOTOS (one).
+export const MIN_PHOTOS = DEFAULT_MIN_PHOTOS;
+export { FEWEST_PHOTOS };
 export const MAX_PHOTOS = 50;
 export const BEAT_TOLERANCE_MS = 60;
 
@@ -26,9 +30,12 @@ export function toggle(order: readonly string[], all: readonly string[], id: str
 }
 
 export type CountCheck = { ok: true } | { ok: false; message: string };
-export function checkCount(n: number): CountCheck {
-  if (n < MIN_PHOTOS)
-    return { ok: false, message: `Add at least ${MIN_PHOTOS} photos (you have ${n}).` };
+export function checkCount(n: number, min: number = MIN_PHOTOS): CountCheck {
+  if (n < min)
+    return {
+      ok: false,
+      message: `Add at least ${min} ${min === 1 ? 'photo' : 'photos'} (you have ${n}).`,
+    };
   if (n > MAX_PHOTOS)
     return { ok: false, message: `That is ${n} photos. Pick ${MAX_PHOTOS} or fewer.` };
   return { ok: true };
