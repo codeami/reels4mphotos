@@ -372,7 +372,7 @@ export const harness = {
   // yet a shifted timestamp or a swapped frame changes it). Proves the file holds the planned
   // frames in the planned order, which the file's metadata alone cannot.
   async encodedFrames(indices: number[]): Promise<EncodedFrameCheck[]> {
-    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 4);
+    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 5);
     const photos = await makePhotos(plan);
     const { blob } = await renderReelWithReport(plan, photos, beatmap, () => {}, {
       forcePath: 'silent',
@@ -425,7 +425,7 @@ export const harness = {
   // hides encoder priming counts) and cross-correlated with the source. null if this browser
   // cannot decode the file's audio.
   async audioLag(path: RenderPathId): Promise<AudioLagResult | null> {
-    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 4);
+    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 5);
     const photos = await makePhotos(plan);
     const { blob } = await renderReelWithReport(plan, photos, beatmap, () => {}, {
       forcePath: path,
@@ -462,7 +462,7 @@ export const harness = {
 
   // A render that has to be refused, with the error the caller would see.
   async runBad(kind: 'wrong-crop' | 'missing-photo'): Promise<HarnessFailure> {
-    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 4);
+    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 5);
     const photos = await makePhotos(plan);
     if (kind === 'missing-photo') photos.delete('photo-2');
     const shots = plan.shots.map((shot, k) =>
