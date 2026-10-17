@@ -1,13 +1,23 @@
 import { FRAME_HEIGHT, FRAME_WIDTH } from '../constants';
-import { lookOf, type Look } from '../../looks';
+import { lookOf, type EdgePulse, type Look } from '../../looks';
 import type { ReelPlan } from '../../types/reel-plan';
 import { LookAssets } from './assets';
 import { backdropKey, buildBackdrop } from './backdrop';
 import type { RenderContext } from './canvas';
-import { destRect, exposedStrips, flashAlpha, punchScale, shakeOffset } from './effects';
+import {
+  destRect,
+  exposedStrips,
+  type DestRect,
+  flashAlpha,
+  punchScale,
+  shakeOffset,
+} from './effects';
+import { buildEdgeSet, pulseRings, scaledAbout, type EdgeSet } from './edges';
+import { bands, drawGlitch, glitchAmount, stripShifts } from './glitch';
 import { sourceRectFor } from './kenburns';
 import { drawFlash, drawGrade, drawGrain, drawLetterbox } from './overlays';
 import type { FrameDescriptor, FrameLayer } from './timeline';
+import { drawZoomThrough } from './zoom-through';
 import { at } from '../util';
 
 export interface DecodedPhoto {
@@ -133,16 +143,99 @@ function drawLayer(
       );
     }
   }
+  if (look.zoomThrough) {
+    drawZoomThrough(ctx, photo.image, source, dest, layer.progress, look.zoomThrough);
+  } else if (look.glitch && timed) {
+    const amount = glitchAmount(timed.sinceCut, look.glitch);
+    const shifts = stripShifts(layer.shotIndex, timed.sinceCut, amount, surface.width, look.glitch);
+    const tallest = Math.max(...bands(surface.height, look.glitch.strips).map((b) => b.h));
+    drawGlitch(
+      ctx,
+      surface.assets.glitchScratch(surface.width, tallest),
+      photo.image,
+      source,
+      dest,
+      shifts,
+      surface,
+    );
+  } else {
+    ctx.drawImage(
+      photo.image,
+      source.sx,
+      source.sy,
+      source.sw,
+      source.sh,
+      dest.x,
+      dest.y,
+      dest.w,
+      dest.h,
+    );
+  }
+  ctx.globalAlpha = 1;
+  if (look.edgePulse && timed) {
+    const edges = look.edgePulse;
+    // the photo goes dark so the outline is what you see
+    ctx.globalAlpha = edges.dim;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, surface.width, surface.height);
+    ctx.globalAlpha = 1;
+    const set = surface.assets.edges.get(shot.photoId, () =>
+      buildEdgeSet(photo, edges, surface.assets.makeScratch),
+    );
+    drawEdgePulse(ctx, set, photo, source, dest, timed.sinceCut, edges);
+  }
+}
+
+// The outline of the photo in light: a soft glow, the lines themselves, and the copies of them
+// growing outwards. 'lighter' adds the light to the dimmed photo; nothing here filters or blurs per
+// frame, it is only the one small canvas drawn at several sizes.
+function drawEdgePulse(
+  ctx: RenderContext,
+  set: EdgeSet,
+  photo: DecodedPhoto,
+  source: { sx: number; sy: number; sw: number; sh: number },
+  dest: DestRect,
+  frameAge: number,
+  look: EdgePulse,
+): void {
+  const ex = set.line.width / photo.width;
+  const ey = set.line.height / photo.height;
+  const gx = set.glow.width / photo.width;
+  const gy = set.glow.height / photo.height;
+  const rings = pulseRings(frameAge, look);
+  ctx.globalCompositeOperation = 'lighter';
+  // the lines are soft already and are scaled up 4x or more: plain bilinear is enough and far cheaper
+  const quality = ctx.imageSmoothingQuality;
+  ctx.imageSmoothingQuality = 'low';
+  const base = at(rings, 0);
+  ctx.globalAlpha = Math.min(1, look.glowAlpha * base.alpha);
   ctx.drawImage(
-    photo.image,
-    source.sx,
-    source.sy,
-    source.sw,
-    source.sh,
+    set.glow as CanvasImageSource,
+    source.sx * gx,
+    source.sy * gy,
+    source.sw * gx,
+    source.sh * gy,
     dest.x,
     dest.y,
     dest.w,
     dest.h,
   );
+  for (const ring of rings) {
+    const r = scaledAbout(dest, ring.scale);
+    ctx.globalAlpha = ring.alpha;
+    ctx.drawImage(
+      set.line as CanvasImageSource,
+      source.sx * ex,
+      source.sy * ey,
+      source.sw * ex,
+      source.sh * ey,
+      r.x,
+      r.y,
+      r.w,
+      r.h,
+    );
+  }
+  ctx.imageSmoothingQuality = quality;
   ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
 }

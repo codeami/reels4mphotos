@@ -1,5 +1,5 @@
 import { h } from '../dom';
-import { checkCount, MAX_PHOTOS, MIN_PHOTOS } from '../logic';
+import { checkCount, FEWEST_PHOTOS, MAX_PHOTOS, MIN_PHOTOS } from '../logic';
 import type { Staged, Thumbs } from '../staging';
 
 export interface ReviewActions {
@@ -13,7 +13,7 @@ export const keptSummary = (list: readonly Staged[]) =>
 /** Big tiles, two per row on a phone. Each tile is one tap target: tap to remove, tap again to keep. */
 export function reviewScreen(list: readonly Staged[], thumbs: Thumbs, a: ReviewActions) {
   const kept = list.filter((x) => x.kept).length;
-  const check = checkCount(kept);
+  const check = checkCount(kept, FEWEST_PHOTOS);
   return h(
     'section',
     { class: 'screen', 'aria-labelledby': 'h-review' },
@@ -22,7 +22,7 @@ export function reviewScreen(list: readonly Staged[], thumbs: Thumbs, a: ReviewA
     h(
       'p',
       { class: 'lede' },
-      `Tap a photo to take it out. Tap it again to keep it. Keep ${MIN_PHOTOS} to ${MAX_PHOTOS}.`,
+      `Tap a photo to take it out. Tap it again to keep it. Keep ${MIN_PHOTOS} to ${MAX_PHOTOS}, or fewer for the single-photo looks.`,
     ),
     !check.ok && h('p', { class: 'notice', role: 'alert' }, check.message),
     h(

@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { startHarnessServer, type HarnessServer } from '../src/render/e2e/harness-server';
 import type { HarnessRun, HarnessRunOptions, LookTiming } from '../src/render/e2e/harness';
-import { LOOK_ORDER } from '../src/looks';
+import { LOOKS, LOOK_ORDER, minPhotosOf } from '../src/looks';
 import { buildTimeline } from '../src/render/frames/timeline';
 import { readMp4Metadata } from '../src/render/metadata';
 
@@ -55,12 +55,70 @@ for (const look of LOOK_ORDER) {
   });
 }
 
+// The three looks that work with one photo, cut and rendered from a single photo.
+const SINGLE_PHOTO_LOOKS = LOOK_ORDER.filter((id) => minPhotosOf(LOOKS[id]) === 1);
+
+for (const look of SINGLE_PHOTO_LOOKS) {
+  test(`${look}: one photo exports a 1080x1920, 30 fps MP4 with the planned frame count`, async ({
+    page,
+  }) => {
+    await openHarness(page);
+    const { plan } = await page.evaluate((l) => window.r4p.reel(undefined, 12, l, 1), look);
+    expect(plan.look).toBe(look);
+    expect(new Set(plan.shots.map((s) => s.photoId)).size).toBe(1);
+    expect(plan.shots).toHaveLength(12);
+    const { run, meta } = await exportFixture(page, { look, shotCount: 12, photoCount: 1 });
+
+    expect(run.report.failedAttempts).toEqual([]);
+    expect(meta.width).toBe(1080);
+    expect(meta.height).toBe(1920);
+    if (run.report.path !== 'mediarecorder') {
+      expect(meta.container).toBe('MP4');
+      expect(meta.fps).toBeGreaterThan(29.5);
+      expect(meta.fps).toBeLessThan(30.5);
+      expect(meta.frameCount).toBe(buildTimeline(plan).frameCount);
+    }
+    expect(run.report.beatAlignment.offBeat).toEqual([]);
+  });
+}
+
+test('a one-photo reel is the whole length: more than eight cuts, 15 to 30 seconds', async ({
+  page,
+}) => {
+  await openHarness(page);
+  for (const look of SINGLE_PHOTO_LOOKS) {
+    const { plan } = await page.evaluate((l) => window.r4p.reel(undefined, 99, l, 1), look);
+    expect(plan.shots.length).toBeGreaterThan(8);
+    expect(plan.totalMs).toBeGreaterThanOrEqual(15_000);
+    expect(plan.totalMs).toBeLessThanOrEqual(30_000);
+  }
+});
+
 test('every look draws different pixels, and the same pixels every time', async ({ page }) => {
   await openHarness(page);
   const hashes = await page.evaluate(() => window.r4p.lookFrameHashes(40));
   const distinct = new Set(Object.values(hashes.first));
   expect(distinct.size).toBe(LOOK_ORDER.length);
   expect(hashes.second).toEqual(hashes.first);
+});
+
+test('export without music from one photo: a video-only MP4 in a single-photo look', async ({
+  page,
+}) => {
+  await openHarness(page);
+  const { selection } = await page.evaluate(() => window.r4p.probe());
+  test.skip(!selection.candidates.includes('silent'), 'this browser cannot make a video-only MP4');
+  const { run, meta } = await exportFixture(page, {
+    look: 'glitch-slice',
+    withoutMusic: true,
+    shotCount: 8,
+    photoCount: 1,
+  });
+  expect(run.report.path).toBe('silent');
+  expect(meta.hasAudio).toBe(false);
+  expect(meta.width).toBe(1080);
+  expect(meta.height).toBe(1920);
+  expect(run.report.beatAlignment.offBeat).toEqual([]);
 });
 
 test('export without music: a video-only MP4, no track fetched, cuts still on the beat', async ({

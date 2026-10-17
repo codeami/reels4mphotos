@@ -22,7 +22,8 @@ export interface HarnessReel {
 // A plan built by curation's own planner from a bundled track's committed beat map, so the
 // renderer is exercised on what the app really produces: cuts on real beats, real Ken Burns crops.
 // `shotCount` keeps the first shots only, for renders that need not run the full 20 s. A look that
-// cuts faster than the classic reel goes round the ten photos more than once.
+// cuts faster than the classic reel goes round the photos more than once; `photoCount` 1 is the
+// single-photo case.
 const beatmaps = new Map<string, Promise<BeatMap>>();
 
 // Fetched once per page, the way the app loads a beat map when a track is picked.
@@ -41,9 +42,10 @@ export async function buildHarnessReel(
   trackId: string = GATE_TRACK_ID,
   shotCount = 10,
   look: LookId = 'classic',
+  photoCount = 10,
 ): Promise<HarnessReel> {
   const beatmap = await loadBeatMap(trackId);
-  const photos: PlanPhoto[] = Array.from({ length: 10 }, (_, i) => ({
+  const photos: PlanPhoto[] = Array.from({ length: photoCount }, (_, i) => ({
     photoId: `photo-${i}`,
     ...harnessPhotoSize(i),
   }));

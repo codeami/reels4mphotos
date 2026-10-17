@@ -7,7 +7,15 @@ export type Rect = { x: number; y: number; w: number; h: number };
 export type Transition = 'cut' | 'crossfade';
 
 /** The look a reel is cut and drawn in. Its numbers live in src/looks; a plan carries only the id. */
-export type LookId = 'classic' | 'zoom-punch' | 'flash-cut' | 'cinematic' | 'photo-dump';
+export type LookId =
+  | 'classic'
+  | 'zoom-punch'
+  | 'flash-cut'
+  | 'cinematic'
+  | 'photo-dump'
+  | 'neon-edge-pulse'
+  | 'zoom-through'
+  | 'glitch-slice';
 
 export interface ReelShot {
   /** Stable id the UI and render engine both use. */

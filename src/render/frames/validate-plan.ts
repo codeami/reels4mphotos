@@ -1,6 +1,6 @@
 import { FPS, FRAME_HEIGHT, FRAME_WIDTH } from '../constants';
 import { RenderError } from '../errors';
-import { isLookId } from '../../looks';
+import { lookOf, isLookId, photoShortfall } from '../../looks';
 import type { Rect, ReelPlan } from '../../types/reel-plan';
 import { at } from '../util';
 
@@ -67,6 +67,14 @@ export function assertValidPlan(plan: ReelPlan): void {
   if (Math.abs(last.startMs + last.durationMs - plan.totalMs) > frameMs) {
     invalid('shots do not add up to totalMs');
   }
+}
+
+// A reel from too few different photos for its look is refused before any encoder starts, in plain
+// words. Kept apart from assertValidPlan, which says whether frames can be drawn at all: a unit
+// test may draw a frame of a look from two photos, an export may not.
+export function assertEnoughPhotos(plan: ReelPlan): void {
+  const shortfall = photoShortfall(lookOf(plan), new Set(plan.shots.map((s) => s.photoId)).size);
+  if (shortfall) invalid(shortfall);
 }
 
 // Every shot must have its photo before any encoder, worker or recorder is started.

@@ -39,6 +39,61 @@ export interface LookPlanning {
   crossfade: 'default' | 'all' | 'none';
   // Ken Burns end zoom (1 = still).
   kenBurnsZoom: number;
+  // Cut length in ms when the beat map is too sparse to count beats. Looks that work with a single
+  // photo need it: without it a sparse map would give one shot of the whole reel.
+  fallbackCutMs?: number;
+  // A photo that comes round again gets a different crop and motion, not the same four moves.
+  varyRepeats?: boolean;
+}
+
+// Neon edge pulse. The outline is found from the photo's own edges: plain image maths (Sobel on a
+// small grey copy), not a model. It is drawn in light over a dimmed photo and expands on the cut.
+export interface EdgePulse {
+  // Width in pixels of the downscaled copy the edges are found on.
+  mapWidth: number;
+  // Edge strength, as a fraction of the strong-edge level, where a line starts and is full.
+  threshold: number;
+  softness: number;
+  // Lines are thickened by this many pixels of the small copy.
+  thicken: number;
+  // How dark the photo goes under the lines (alpha of a black fill).
+  dim: number;
+  lineColor: string;
+  glowColor: string;
+  // Alpha of the outline between beats, and on the cut.
+  baseAlpha: number;
+  peakAlpha: number;
+  glowAlpha: number;
+  // Expanding copies of the outline: how many, frames between their starts, frames each lasts, the
+  // growth at the end of its life (0.2 = 20% larger), and its alpha when it starts.
+  rings: number;
+  ringDelayFrames: number;
+  ringFrames: number;
+  maxExpand: number;
+  ringPeak: number;
+}
+
+// Zoom-through: the photo drawn inside itself, `inner` times the size each level down, pushing in
+// over the length of the shot so the next level takes the place of the one above it.
+export interface ZoomThrough {
+  inner: number;
+  // Levels smaller than this fraction of the frame are not drawn.
+  minScale: number;
+  // Width of the white frame around each inner copy, as a fraction of frame width.
+  border: number;
+}
+
+// Glitch slice: the frame is cut into horizontal strips that slide sideways and split into red,
+// green and blue on the cut, then snap back over `frames`.
+export interface Glitch {
+  strips: number;
+  // Largest slide, as a fraction of frame width.
+  peak: number;
+  frames: number;
+  // Which share of the strips move on a glitch frame.
+  share: number;
+  // Red and blue pull apart by this fraction of the largest slide, scaled by how far the glitch is.
+  chroma: number;
 }
 
 // Everything a look does, as data. Sizes are fractions of the frame so one look serves the
@@ -55,6 +110,8 @@ export interface Look {
   crossfadeFrames: number;
   crossfadeEasing: Easing;
   planning: LookPlanning;
+  // Fewest different photos the look can be cut from; absent means DEFAULT_MIN_PHOTOS.
+  minPhotos?: number;
   punch: Punch | null;
   flash: Flash | null;
   // Peak drift of the photo in a small shake, as a fraction of frame width.
@@ -63,4 +120,8 @@ export interface Look {
   vignette: number; // alpha at the corners, 0 = none
   letterbox: number; // bar height as a fraction of frame height, 0 = none
   grade: readonly GradeFill[];
+  // At most one of these three is set; each look that sets one is drawn by its own small module.
+  edgePulse?: EdgePulse;
+  zoomThrough?: ZoomThrough;
+  glitch?: Glitch;
 }
