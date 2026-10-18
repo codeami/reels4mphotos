@@ -8,7 +8,7 @@ import {
   throwIfAborted,
   type RenderErrorCode,
 } from './errors';
-import { assertValidPlan, assertPhotosPresent } from './frames/validate-plan';
+import { assertEnoughPhotos, assertValidPlan, assertPhotosPresent } from './frames/validate-plan';
 import {
   selectPaths,
   type Capabilities,
@@ -83,6 +83,7 @@ export async function orchestrate(
 ): Promise<RenderResult> {
   const startedAt = performance.now();
   assertValidPlan(plan);
+  assertEnoughPhotos(plan);
   assertPhotosPresent(plan, photos);
   const { signal } = options;
   throwIfAborted(signal);

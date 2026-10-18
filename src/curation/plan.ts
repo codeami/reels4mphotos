@@ -1,4 +1,4 @@
-import { DEFAULT_LOOK, LOOKS, type LookPlanning } from '../looks';
+import { DEFAULT_LOOK, LOOKS, photoShortfall, type LookPlanning } from '../looks';
 import type { LookId, Rect, ReelPlan, ReelShot, Transition } from '../types/reel-plan';
 import type { BeatMap, PlanPhoto } from './types';
 import { must } from './must';
@@ -11,6 +11,8 @@ const FRAME_ASPECT = 9 / 16;
 const ZOOM_IN_TO = 1.2;
 const PAN = 0.12;
 const CROSSFADE_EVERY = 3;
+// Beats must reach at least this share of the target length for the cuts to be counted on them.
+const MIN_BEAT_COVER = 0.6;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -30,14 +32,21 @@ export function kenBurnsFor(
   index: number,
   width?: number,
   height?: number,
-  style: { fit: 'cover' | 'contain'; zoom: number } = { fit: 'cover', zoom: ZOOM_IN_TO },
+  style: { fit: 'cover' | 'contain'; zoom: number; variant?: number } = {
+    fit: 'cover',
+    zoom: ZOOM_IN_TO,
+  },
 ): { from: Rect; to: Rect } {
   const aspect = width && height ? width / height : FRAME_ASPECT;
   // A look that fits the photo inside the frame moves over the whole photo, not a 9:16 part of it.
   const covers = style.fit === 'cover';
   const fullW = covers && aspect > FRAME_ASPECT ? FRAME_ASPECT / aspect : 1;
   const fullH = covers && aspect <= FRAME_ASPECT ? aspect / FRAME_ASPECT : 1;
-  const zoomIn = style.zoom;
+  // A photo that comes round again moves a different distance: the zoom and the pan grow and
+  // shrink with `variant` (0 for the first pass and for looks that do not vary repeats).
+  const variant = style.variant ?? 0;
+  const zoomIn = 1 + (style.zoom - 1) * (1 + 0.5 * (variant % 3));
+  const pan = PAN * (1 + 0.4 * (Math.floor(variant / 3) % 2));
 
   const sx = index % 2 === 0 ? -1 : 1;
   const sy = Math.floor(index / 2) % 2 === 0 ? -1 : 1;
@@ -45,15 +54,15 @@ export function kenBurnsFor(
     fullW,
     fullH,
     index % 2 === 0 ? 1 : zoomIn,
-    0.5 + sx * PAN,
-    0.5 + sy * PAN * 0.5,
+    0.5 + sx * pan,
+    0.5 + sy * pan * 0.5,
   );
   const end = cropWindow(
     fullW,
     fullH,
     index % 2 === 0 ? zoomIn : 1,
-    0.5 - sx * PAN,
-    0.5 - sy * PAN * 0.5,
+    0.5 - sx * pan,
+    0.5 - sy * pan * 0.5,
   );
   return { from: start, to: end };
 }
@@ -138,7 +147,8 @@ function beatShotEnds(
     cursor += length;
     ends.push(must(beats[cursor]));
   }
-  return ends;
+  // A beat map that stops far short of the length asked for cannot carry the reel: cut evenly.
+  return must(ends[ends.length - 1]) < MIN_BEAT_COVER * targetMs ? null : ends;
 }
 
 function transitionFor(planning: LookPlanning, index: number, offset: number): Transition {
@@ -172,12 +182,22 @@ export function buildPlan(
   if (chosen.length === 0) return { ...header, totalMs: 0, shots: [] };
 
   const look = LOOKS[lookId];
+  const shortfall = photoShortfall(look, new Set(chosen.map((p) => p.photoId)).size);
+  if (shortfall) throw new Error(shortfall);
   const ceiling = Math.min(MAX_REEL_MS, beatmap.durationMs);
   const target = Math.min(clamp(targetDurationMs, MIN_REEL_MS, MAX_REEL_MS), ceiling);
+  // With no beats to count on, a look that repeats photos still cuts at its own pace.
+  const evenCount = look.planning.fallbackCutMs
+    ? clamp(
+        Math.round(target / look.planning.fallbackCutMs),
+        chosen.length,
+        chosen.length * look.planning.maxPasses,
+      )
+    : chosen.length;
   const ends =
     (look.planning.cutBeats &&
       beatShotEnds(chosen.length, target, ceiling, beatmap.beatsMs, look.planning)) ||
-    shotEnds(chosen.length, target, ceiling, Math.min(MIN_REEL_MS, ceiling), beatmap.beatsMs);
+    shotEnds(evenCount, target, ceiling, Math.min(MIN_REEL_MS, ceiling), beatmap.beatsMs);
 
   // More cuts than photos means the set is gone through again, in the same order.
   const shots: ReelShot[] = ends.map((end, i) => {
@@ -191,6 +211,7 @@ export function buildPlan(
       kenBurns: kenBurnsFor(i, photo.width, photo.height, {
         fit: look.fit,
         zoom: look.planning.kenBurnsZoom,
+        variant: look.planning.varyRepeats ? Math.floor(i / chosen.length) + i : 0,
       }),
     };
   });

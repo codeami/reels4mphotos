@@ -23,6 +23,8 @@ function recorder(): { ctx: RenderContext; calls: Call[]; ops: () => string[] } 
         calls.push({ op: prop, args });
         if (prop === 'createImageData')
           return { data: new Uint8ClampedArray((args[0] as number) * (args[1] as number) * 4) };
+        if (prop === 'getImageData')
+          return { data: new Uint8ClampedArray((args[2] as number) * (args[3] as number) * 4) };
         if (prop === 'createRadialGradient') return { addColorStop: () => undefined };
         return undefined;
       };
@@ -208,5 +210,91 @@ describe('drawFrame', () => {
     expect(() =>
       frame(planFor('cinematic', 'whole'), 3, { width: FRAME_WIDTH, height: FRAME_HEIGHT, assets }),
     ).not.toThrow();
+  });
+});
+
+describe('drawFrame in the single-photo looks', () => {
+  const surfaceWith = (assets: LookAssets): DrawSurface => ({
+    width: FRAME_WIDTH,
+    height: FRAME_HEIGHT,
+    assets,
+  });
+  const modes = (calls: Call[]) =>
+    calls.filter((c) => c.op === 'set globalCompositeOperation').map((c) => c.args[0]);
+
+  it('neon edge pulse finds the edges of a photo once, then only draws them, over a darkened photo', () => {
+    const { assets, made } = scratchWithRecorder();
+    const plan = planFor('neon-edge-pulse', 'whole');
+    // two frames of the first shot, then the first frame of the second shot (another photo)
+    const first = frame(plan, 2, surfaceWith(assets));
+    frame(plan, 5, surfaceWith(assets));
+    expect(assets.edges.builds).toBe(1);
+    frame(plan, 31, surfaceWith(assets));
+    expect(assets.edges.builds).toBe(2);
+    // the edge map is made on a small copy, never at the frame size
+    expect(made).toContainEqual([256, 192]);
+    expect(modes(first.calls)).toContain('lighter');
+    // the photo is darkened (a black fill at the look's dim) before the lines are added
+    const dim = LOOKS['neon-edge-pulse'].edgePulse?.dim;
+    const photoAt = first.calls.findIndex(
+      (c) => c.op === 'drawImage' && c.args[0] === LANDSCAPE.image,
+    );
+    const fills = first.calls
+      .slice(photoAt)
+      .filter((c) => c.op === 'set globalAlpha' && c.args[0] === dim);
+    expect(fills).toHaveLength(1);
+  });
+
+  it('neon edge pulse draws more outlines on the cut than between beats', () => {
+    const { assets } = scratchWithRecorder();
+    const plan = planFor('neon-edge-pulse', 'whole');
+    const lines = (index: number) =>
+      frame(plan, index, surfaceWith(assets)).drawn.filter(
+        (c) => c.args.length === 9 && (c.args[0] as { width?: number }).width === 256,
+      ).length;
+    expect(lines(1)).toBeGreaterThan(lines(25));
+  });
+
+  it('zoom-through draws the photo several times, each smaller one inside the one before', () => {
+    const { assets } = scratchWithRecorder();
+    const { drawn, ops } = frame(planFor('zoom-through', 'nine-sixteen'), 10, surfaceWith(assets));
+    const photos = drawn.filter((c) => c.args[0] === LANDSCAPE.image);
+    expect(photos.length).toBeGreaterThanOrEqual(4);
+    const widths = photos.map((c) => c.args[7] as number);
+    expect([...widths].sort((a, b) => b - a)).toEqual(widths);
+    expect(widths[0]).toBeGreaterThanOrEqual(FRAME_WIDTH);
+    expect(ops().filter((op) => op === 'strokeRect')).toHaveLength(photos.length - 1);
+  });
+
+  it('zoom-through flashes white on the cut and not between cuts', () => {
+    const { assets } = scratchWithRecorder();
+    const plan = planFor('zoom-through', 'nine-sixteen');
+    const flashes = (index: number) =>
+      frame(plan, index, surfaceWith(assets)).calls.filter(
+        (c) => c.op === 'fillRect' && c.args[2] === FRAME_WIDTH && c.args[3] === FRAME_HEIGHT,
+      ).length;
+    expect(flashes(30)).toBeGreaterThan(flashes(45));
+  });
+
+  it('glitch slice draws the photo once when nothing moves, and splits colours on the cut', () => {
+    const { assets } = scratchWithRecorder();
+    const plan = planFor('glitch-slice', 'nine-sixteen');
+    const settled = frame(plan, 20, surfaceWith(assets));
+    expect(settled.drawn.filter((c) => c.args[0] === LANDSCAPE.image)).toHaveLength(1);
+    const cut = frame(plan, 30, surfaceWith(assets));
+    expect(modes(cut.calls)).toContain('lighter');
+    expect(modes(cut.calls)).not.toContain('difference');
+    // each moving strip is added back as three one-colour copies
+    expect(cut.drawn.length - settled.drawn.length).toBeGreaterThanOrEqual(3);
+    expect((cut.drawn.length - settled.drawn.length) % 3).toBe(0);
+  });
+
+  it('draws the same calls for the same frame, every time', () => {
+    for (const look of ['neon-edge-pulse', 'zoom-through', 'glitch-slice'] as const) {
+      const crops = LOOKS[look].fit === 'cover' ? 'nine-sixteen' : 'whole';
+      const a = frame(planFor(look, crops), 31, surfaceWith(scratchWithRecorder().assets));
+      const b = frame(planFor(look, crops), 31, surfaceWith(scratchWithRecorder().assets));
+      expect(JSON.stringify(a.calls)).toBe(JSON.stringify(b.calls));
+    }
   });
 });

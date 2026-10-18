@@ -1,2 +1,24 @@
-export { DEFAULT_LOOK, LOOKS, LOOK_ORDER, isLookId, lookOf } from './looks';
-export type { Look, LookId, LookPlanning, Punch, Flash, GradeFill, Easing } from './types';
+export {
+  DEFAULT_LOOK,
+  DEFAULT_MIN_PHOTOS,
+  FEWEST_PHOTOS,
+  LOOKS,
+  LOOK_ORDER,
+  isLookId,
+  lookForPhotoCount,
+  lookOf,
+  minPhotosOf,
+  photoShortfall,
+} from './looks';
+export type {
+  EdgePulse,
+  Easing,
+  Flash,
+  Glitch,
+  GradeFill,
+  Look,
+  LookId,
+  LookPlanning,
+  Punch,
+  ZoomThrough,
+} from './types';

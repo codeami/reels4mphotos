@@ -10,15 +10,11 @@ test.beforeEach(async ({ page }) => {
 
 test('file input accepts image/* and nothing else', async ({ page }) => {
   await expect(page.locator('#photo-input')).toHaveAttribute('accept', 'image/*');
-  await expect(page.getByText('5–50 photos', { exact: false }).first()).toBeVisible();
+  await expect(page.getByText('1–50 photos', { exact: false }).first()).toBeVisible();
 });
 
-test('states the 5-50 range instead of failing silently', async ({ page }) => {
-  const few = await makePhotos(page, 3);
-  await page.setInputFiles('#photo-input', few);
-  await expect(page.getByRole('alert')).toContainText('at least 5');
+test('states the 50 photo limit instead of failing silently', async ({ page }) => {
   const many = await makePhotos(page, 51);
-  await page.getByRole('button', { name: 'Cancel' }).click();
   await page.setInputFiles('#photo-input', many);
   await expect(page.getByRole('alert')).toContainText('50 or fewer');
   await expect(page.getByTestId('next')).toBeDisabled();

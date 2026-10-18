@@ -56,6 +56,13 @@ describe('checkCount', () => {
     expect(checkCount(5)).toEqual({ ok: true });
     expect(checkCount(50)).toEqual({ ok: true });
   });
+
+  it('takes a single photo when the smallest minimum is asked for, and says so in plain words', () => {
+    expect(checkCount(1, 1)).toEqual({ ok: true });
+    expect(checkCount(0, 1)).toEqual({ ok: false, message: 'Add at least 1 photo (you have 0).' });
+    expect(checkCount(1)).toEqual({ ok: false, message: 'Add at least 5 photos (you have 1).' });
+    expect(checkCount(51, 1)).toMatchObject({ ok: false });
+  });
 });
 
 describe('isHeic', () => {

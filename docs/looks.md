@@ -6,7 +6,7 @@ Everything is canvas 2D on the device. No text, no font, no image or video file,
 
 Numbers come from the scout's recipes in `data/reels-style-catalog-scout/looks.json` (firstmate repo). Those recipes were read from public style descriptions and a few parameters in unlicensed Remotion template snippets (numbers only, no code copied). Treat the looks as our own recipes. Do not call them "trending" or credit any app or creator (`docs/claims-checklist.md`).
 
-## The five looks
+## The eight looks
 
 | Look | Cut length | Fit and fill | On every cut | Always on | Source recipe |
 | --- | --- | --- | --- | --- | --- |
@@ -16,7 +16,24 @@ Numbers come from the scout's recipes in `data/reels-style-catalog-scout/looks.j
 | Cinematic | 4 to 8 beats | whole photo inside the frame, black behind | 18 frame smoothstep crossfade into every shot | black bars (10% of the height each), grain (9%), vignette (50%), teal shadows and warm highlights (two translucent fills), Ken Burns zoom 1.10 | `cinematic` |
 | Photo dump | 1 to 2 beats | whole photo inside the frame, average photo colour behind | nothing | grain (5%), small handheld drift (0.4% of the width), warm lift (one translucent fill) | `photo-dump` |
 
+The last three work with a single photo (`minPhotos` 1); the first five need five different photos, as the app always has:
+
+| Look | Cut length | Fit and fill | On every cut | Always on |
+| --- | --- | --- | --- | --- |
+| Neon edge (`neon-edge-pulse`) | 1 to 2 beats | whole photo inside the frame, blurred copy behind | the outline brightens to full and 2 copies of it grow 16% outwards over 16 frames, fading, 3 frames apart | photo dimmed by 60%, outline at 50%, glow, vignette (45%) |
+| Zoom through (`zoom-through`) | 2 beats | 9:16 crop, black | white flash 65% to 0 over 5 frames | the photo pushes in over the shot with itself at half size inside it, repeating (down to 6% of the frame), thin white frame on each inner copy, vignette (30%) |
+| Glitch slice (`glitch-slice`) | 1 beat | 9:16 crop, black | 14 strips, 60% of them slide sideways (up to 10% of the width) with red and blue pulled apart, back to normal over 9 frames | grain (7%), vignette (30%) |
+
 Left out on purpose, because they need text or a font: the date stamp (photo dump), the optional title (cinematic). Left out of photo dump: the 20% flash cuts (it would repeat flash cut).
+
+## The single-photo looks
+
+Nothing here uses a model, `ctx.filter`, `shadowBlur` or a pixel loop over the whole frame per frame. All numbers are data in `src/looks/looks.ts`; the drawing is small pure functions with unit tests (`edges.test.ts`, `zoom-through.test.ts`, `glitch.test.ts`).
+
+- **Edge detection is plain image maths, not a model.** For each photo, once: shrink it to 256 px wide, take the grey level of each pixel, run the Sobel operator (two 3x3 sums that measure how fast the grey level changes), keep what is above a threshold (a fraction of the strong-edge level of that photo, the 99th percentile), thicken by a pixel, tint. The result is a small canvas of light lines, cached per photo (`EdgeSet`, 4 entries). Per frame it is only drawn: a soft glow (a 40 px copy scaled up), the lines, and the growing copies, all added with `'lighter'` over a dimmed photo. Nothing finds a person or cuts one out; the outline follows every strong edge in the picture. A person-cutout model is a later decision.
+- **Zoom through:** level k is the photo at `inner`^k of the frame, the stack grows by one level over the shot, so at the end level 1 sits where level 0 started. Each level is one `drawImage`.
+- **Glitch slice:** the whole photo is drawn once; each moving strip is redrawn as three one-colour copies (black fill, photo, `'multiply'` by red, green or blue, added with `'lighter'`) on a small scratch canvas the height of a strip. Which strips move comes from a seeded generator (shot number, frame age), so a frame is still a pure function of the plan.
+- **Photo count:** a look declares `minPhotos` (absent means 5). `buildPlan` refuses fewer different photos with "Cinematic needs at least 5 photos (you have 3)." and the render refuses such a plan before any encoder starts (`assertEnoughPhotos`). With one photo the planner repeats it on the beat (`maxPasses` 40, `varyRepeats`: each repeat gets a different zoom and pan), and if the beat map is too sparse it cuts every `fallbackCutMs`. In the app, if fewer photos are chosen than the current look needs, the first look that works is selected, and the chips that need more photos are greyed out with how many.
 
 ## How cuts are counted
 
@@ -63,7 +80,12 @@ Measured by `e2e/looks.spec.ts` ("render time per frame of each look"): headless
 | Flash cut | 106 | 157 | 160 |
 | Cinematic | 76 | 134 | 103 |
 | Photo dump | 89 | 132 | 136 |
+| Neon edge (1 photo) | 198 | 247 | 186 |
+| Zoom through (1 photo) | 202 | 245 | 111 |
+| Glitch slice (1 photo) | 148 | 231 | 153 |
 
 What looks heavy: every full-frame step (the vignette, a grade fill, the grain, the blurred fill) costs a pass over two million pixels on a CPU canvas. Already done to cut that: the vignette is drawn once and reused, grain is one pattern fill, and the blurred fill is drawn only where the photo leaves the frame bare. Zoom punch is the heaviest look. Fast looks also go round the photos again, and the photo cache holds 3, so they decode a photo at nearly every cut; that is the "shot start" column.
 
 Not tested on a phone. An iPhone canvas is normally GPU-backed, which should make these steps cheaper than here, but that is a guess. To check on the phone: export each look (Standard length) and note the time; watch for the export taking much longer than Classic, the tab being killed, or the preview stuttering while a look plays.
+
+The three single-photo rows come from the same spec run, cut from one photo (40 shots of one 3072 px photo). The machine was busy (other jobs running): in that run the older looks measured higher than the table's first five rows (classic 76, zoom punch 134, flash cut 155, cinematic 149, photo dump 167), so compare the new rows with those. Neon edge started at 388 ms and came down to about 198 after the lines were drawn with cheap bilinear scaling, no grain and two growing copies instead of three. Glitch slice is cheap on most frames (one draw of the photo) and dearer for the 9 frames after each beat.

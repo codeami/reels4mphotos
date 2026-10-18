@@ -19,16 +19,16 @@ Someone with a camera roll full of trip / event photos who wants a reel to post 
 
 ## MVP (core loop)
 
-1. **Add photos** — choose 5–50 photos from the device (file picker / iOS photo sheet).
+1. **Add photos** — choose 5–50 photos from the device (file picker / iOS photo sheet). Three looks (Neon edge, Zoom through, Glitch slice) also work with fewer, down to a single photo.
 2. **Auto-select** — the app picks the best ~10 on-device: drops blurry, badly exposed and near-duplicate shots, keeps a spread across time. The user can toggle any photo in or out and drag to reorder.
 3. **Pick a beat** — one of 3 bundled royalty-free tracks, each with a pre-computed beat map.
 4. **Preview** — 1080×1920, 30 fps: Ken Burns pan/zoom on each photo, cuts land on beats, 2 transition styles. Target 15–30 s.
-5. **Pick a look** — a row of chips under the preview: Classic, Zoom punch, Flash cut, Cinematic, Photo dump. Each cuts and draws the same photos its own way (see `docs/looks.md`). No text, no fonts, all drawn on the device.
+5. **Pick a look** — a row of chips under the preview: Classic, Zoom punch, Flash cut, Cinematic, Photo dump, and the three single-photo looks (marked "works with one photo"). Each cuts and draws the same photos its own way (see `docs/looks.md`). No text, no fonts, all drawn on the device.
 6. **Export & share** — MP4 (H.264 + AAC) saved to the device or shared through the system share sheet. Or tick **Export without music** for a video-only MP4 and add a song inside Instagram when you post; the cuts still follow the beat of the track you chose.
 
 Everything runs in the browser. No account, no server, no network after the page loads.
 
-Looks (the five chips above) and the silent export are in scope.
+Looks (the eight chips above) and the silent export are in scope. The single-photo looks are plain canvas drawing: the neon outline is found from the photo's own edges with image maths (Sobel), not a model, and no person cut-out is done.
 
 ## Out of scope for MVP
 

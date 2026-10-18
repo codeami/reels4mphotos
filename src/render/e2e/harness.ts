@@ -15,7 +15,7 @@ import {
   type RenderPathId,
 } from '../probe';
 import type { RenderReport } from '../report';
-import { LOOK_ORDER } from '../../looks';
+import { LOOKS, LOOK_ORDER, minPhotosOf } from '../../looks';
 import type { LookId, ReelPlan } from '../../types/reel-plan';
 import { GATE_TRACK_ID, buildHarnessReel, harnessPhotoSize } from './harness-reel';
 
@@ -38,10 +38,14 @@ export interface HarnessRunOptions {
   look?: LookId;
   // Export the video with no music.
   withoutMusic?: boolean;
+  // Cut from this many different photos (default ten); 1 is the single-photo case.
+  photoCount?: number;
 }
 
 export interface LookTiming {
   look: LookId;
+  // Different photos the timed reel was cut from: one for the single-photo looks.
+  photos: number;
   frames: number;
   // Milliseconds to draw one frame at 1080x1920 and hand it to the encoder as a VideoFrame.
   medianMs: number;
@@ -148,7 +152,10 @@ function percentile(values: number[], p: number): number {
 
 async function makePhotos(plan: ReelPlan): Promise<Map<string, Blob>> {
   const entries = await Promise.all(
-    plan.shots.map(async (shot, k) => [shot.photoId, await makePhoto(k)] as const),
+    // the photo's number is in its id (photo-3), and its shape follows the number, as the plan assumed
+    [...new Set(plan.shots.map((shot) => shot.photoId))].map(
+      async (photoId) => [photoId, await makePhoto(Number(photoId.replace(/\D/g, '')))] as const,
+    ),
   );
   return new Map(entries);
 }
@@ -188,8 +195,9 @@ export const harness = {
     trackId?: string,
     shotCount?: number,
     look?: LookId,
+    photoCount?: number,
   ): Promise<{ plan: ReelPlan; beatmap: BeatMap }> {
-    return buildHarnessReel(trackId, shotCount, look);
+    return buildHarnessReel(trackId, shotCount, look, photoCount);
   },
 
   // One frame of each look, twice from independent generators: a look is a pure function of the frame.
@@ -257,6 +265,7 @@ export const harness = {
       options.trackId,
       options.shotCount,
       options.look,
+      options.photoCount,
     );
     const photos = await makePhotos(plan);
     const progress: number[] = [];
@@ -288,7 +297,9 @@ export const harness = {
   async benchLooks(frameCount = 300): Promise<LookTiming[]> {
     const timings: LookTiming[] = [];
     for (const look of LOOK_ORDER) {
-      const { plan } = await buildHarnessReel(GATE_TRACK_ID, 40, look);
+      // the single-photo looks are timed on the case they are for: one photo, many cuts
+      const photoCount = minPhotosOf(LOOKS[look]) === 1 ? 1 : 10;
+      const { plan } = await buildHarnessReel(GATE_TRACK_ID, 40, look, photoCount);
       const photos = new Map<string, Blob>();
       for (const shot of plan.shots) {
         if (!photos.has(shot.photoId)) photos.set(shot.photoId, await makeBenchPhoto(photos.size));
@@ -322,6 +333,7 @@ export const harness = {
       }
       timings.push({
         look,
+        photos: photoCount,
         frames: total,
         medianMs: percentile(full, 0.5),
         p95Ms: percentile(full, 0.95),
@@ -360,7 +372,7 @@ export const harness = {
   // yet a shifted timestamp or a swapped frame changes it). Proves the file holds the planned
   // frames in the planned order, which the file's metadata alone cannot.
   async encodedFrames(indices: number[]): Promise<EncodedFrameCheck[]> {
-    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 4);
+    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 5);
     const photos = await makePhotos(plan);
     const { blob } = await renderReelWithReport(plan, photos, beatmap, () => {}, {
       forcePath: 'silent',
@@ -413,7 +425,7 @@ export const harness = {
   // hides encoder priming counts) and cross-correlated with the source. null if this browser
   // cannot decode the file's audio.
   async audioLag(path: RenderPathId): Promise<AudioLagResult | null> {
-    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 4);
+    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 5);
     const photos = await makePhotos(plan);
     const { blob } = await renderReelWithReport(plan, photos, beatmap, () => {}, {
       forcePath: path,
@@ -450,7 +462,7 @@ export const harness = {
 
   // A render that has to be refused, with the error the caller would see.
   async runBad(kind: 'wrong-crop' | 'missing-photo'): Promise<HarnessFailure> {
-    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 4);
+    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 5);
     const photos = await makePhotos(plan);
     if (kind === 'missing-photo') photos.delete('photo-2');
     const shots = plan.shots.map((shot, k) =>

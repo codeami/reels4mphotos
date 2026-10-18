@@ -1,5 +1,6 @@
 import { h } from '../dom';
-import { MAX_PHOTOS, MIN_PHOTOS } from '../logic';
+import { LOOKS, LOOK_ORDER, minPhotosOf } from '../../looks';
+import { FEWEST_PHOTOS, MAX_PHOTOS, MIN_PHOTOS } from '../logic';
 import type { Skipped, State } from '../store';
 
 export interface AddActions {
@@ -20,6 +21,17 @@ export function skippedChips(skipped: Skipped[]): HTMLElement {
       ),
     ),
   );
+}
+
+// The names of the looks that work with a single photo, for the line on the first screen.
+const SINGLE_PHOTO_NAMES = LOOK_ORDER.filter((id) => minPhotosOf(LOOKS[id]) <= FEWEST_PHOTOS).map(
+  (id) => LOOKS[id].name,
+);
+
+function joinNames(names: readonly string[]): string {
+  return names.length < 2
+    ? names.join('')
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
 export function addScreen(s: State, a: AddActions): HTMLElement {
@@ -47,6 +59,11 @@ export function addScreen(s: State, a: AddActions): HTMLElement {
       `Choose ${MIN_PHOTOS} to ${MAX_PHOTOS} photos. We pick about ten and cut them to a beat.`,
     ),
     h(
+      'p',
+      { class: 'lede small', 'data-testid': 'single-photo-note' },
+      `Only have one photo? ${joinNames(SINGLE_PHOTO_NAMES)} work with a single photo.`,
+    ),
+    h(
       'label',
       { class: 'drop', for: 'photo-input' },
       h(
@@ -55,7 +72,7 @@ export function addScreen(s: State, a: AddActions): HTMLElement {
         h('span', { class: 'drop-plus' }, '+'),
       ),
       h('span', { class: 'drop-title' }, s.busy ?? 'Add photos'),
-      h('span', { class: 'drop-sub' }, `${MIN_PHOTOS}–${MAX_PHOTOS} photos · JPEG, PNG or HEIC`),
+      h('span', { class: 'drop-sub' }, `${FEWEST_PHOTOS}–${MAX_PHOTOS} photos · JPEG, PNG or HEIC`),
     ),
     input,
     s.notice && h('p', { class: 'notice', role: 'alert' }, s.notice),

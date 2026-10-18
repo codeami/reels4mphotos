@@ -89,8 +89,8 @@ describe('buildPlan', () => {
   });
 
   it('still produces an even plan when the beat map has no beats', () => {
-    const plan = buildPlan(chosen(4), { ...beatmap, beatsMs: [] }, 20_000);
-    expect(plan.shots).toHaveLength(4);
+    const plan = buildPlan(chosen(5), { ...beatmap, beatsMs: [] }, 20_000);
+    expect(plan.shots).toHaveLength(5);
     expect(plan.totalMs).toBeGreaterThanOrEqual(15_000);
   });
 
@@ -221,7 +221,7 @@ describe('buildPlan with a look', () => {
   });
 
   it('moves over the whole photo when the look fits it inside the frame', () => {
-    const plan = buildPlan(chosen(4), beatmap, 20_000, 0, 'zoom-punch');
+    const plan = buildPlan(chosen(5), beatmap, 20_000, 0, 'zoom-punch');
     const first = must(plan.shots[0]);
     // the whole 4:3 photo is the widest crop, so a zoomed window keeps the photo's own aspect
     for (const r of [first.kenBurns.from, first.kenBurns.to]) {
@@ -241,5 +241,127 @@ describe('buildPlan with a look', () => {
     expect(buildPlan(chosen(10), beatmap, 20_000, 0, 'photo-dump')).toEqual(
       buildPlan(chosen(10), beatmap, 20_000, 0, 'photo-dump'),
     );
+  });
+});
+
+const SINGLE_PHOTO_LOOKS = ['neon-edge-pulse', 'zoom-through', 'glitch-slice'] as const;
+
+describe('buildPlan from one photo', () => {
+  const beatmap = syntheticBeatMap(120, 60_000);
+  const sameShape = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+  it('makes a full-length reel on the beat from a single photo, in every single-photo look', () => {
+    for (const look of SINGLE_PHOTO_LOOKS) {
+      const plan = buildPlan(chosen(1), beatmap, 20_000, 0, look);
+      expect(plan.look).toBe(look);
+      expect(plan.totalMs).toBeGreaterThanOrEqual(15_000);
+      expect(plan.totalMs).toBeLessThanOrEqual(30_000);
+      expect(plan.shots.length).toBeGreaterThanOrEqual(8);
+      expect(new Set(plan.shots.map((s) => s.photoId))).toEqual(new Set(['p0']));
+      expect(plan.shots.every((s) => beatmap.beatsMs.includes(s.startMs))).toBe(true);
+      expect(plan.shots.every((s) => s.transition === 'cut')).toBe(true);
+      let cursor = 0;
+      for (const shot of plan.shots) {
+        expect(shot.startMs).toBe(cursor);
+        cursor += shot.durationMs;
+      }
+      expect(cursor).toBe(plan.totalMs);
+    }
+  });
+
+  it('gives each repeat of the photo a different crop and motion, not the same few moves', () => {
+    for (const look of SINGLE_PHOTO_LOOKS) {
+      const plan = buildPlan(chosen(1), beatmap, 20_000, 0, look);
+      const moves = plan.shots.map((s) => JSON.stringify(s.kenBurns));
+      expect(new Set(moves).size).toBeGreaterThanOrEqual(8);
+      // neighbouring shots never repeat each other
+      moves.slice(1).forEach((m, i) => expect(m).not.toBe(moves[i]));
+    }
+  });
+
+  it('keeps every crop inside the photo, and 9:16 for the looks that fill the frame', () => {
+    for (const look of SINGLE_PHOTO_LOOKS) {
+      const plan = buildPlan(chosen(1), beatmap, 20_000, 0, look);
+      for (const shot of plan.shots) {
+        for (const r of [shot.kenBurns.from, shot.kenBurns.to]) {
+          expect(r.x).toBeGreaterThanOrEqual(-1e-9);
+          expect(r.y).toBeGreaterThanOrEqual(-1e-9);
+          expect(r.x + r.w).toBeLessThanOrEqual(1 + 1e-9);
+          expect(r.y + r.h).toBeLessThanOrEqual(1 + 1e-9);
+          if (look !== 'neon-edge-pulse')
+            expect((r.w * 4000) / (r.h * 3000)).toBeCloseTo(9 / 16, 3);
+        }
+      }
+    }
+  });
+
+  it('still cuts a one-photo reel when the beat map has too few beats to count', () => {
+    const sparse = { ...beatmap, beatsMs: [0, 4000, 9000] };
+    for (const look of SINGLE_PHOTO_LOOKS) {
+      const plan = buildPlan(chosen(1), sparse, 20_000, 0, look);
+      expect(plan.shots.length).toBeGreaterThan(5);
+      expect(plan.totalMs).toBeGreaterThanOrEqual(15_000);
+    }
+  });
+
+  it('cuts two and three photos in the same looks, and is deterministic', () => {
+    for (const look of SINGLE_PHOTO_LOOKS) {
+      for (const n of [2, 3]) {
+        const plan = buildPlan(chosen(n), beatmap, 20_000, 0, look);
+        expect(new Set(plan.shots.map((s) => s.photoId)).size).toBe(n);
+      }
+      expect(
+        sameShape(
+          buildPlan(chosen(1), beatmap, 20_000, 0, look),
+          buildPlan(chosen(1), beatmap, 20_000, 0, look),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it('refuses fewer photos than the other looks need, in plain words', () => {
+    expect(() => buildPlan(chosen(4), beatmap, 20_000)).toThrow(
+      'Classic needs at least 5 photos (you have 4).',
+    );
+    for (const [look, name] of [
+      ['zoom-punch', 'Zoom punch'],
+      ['flash-cut', 'Flash cut'],
+      ['cinematic', 'Cinematic'],
+      ['photo-dump', 'Photo dump'],
+    ] as const) {
+      expect(() => buildPlan(chosen(1), beatmap, 20_000, 0, look)).toThrow(
+        `${name} needs at least 5 photos (you have 1).`,
+      );
+    }
+  });
+
+  it('counts different photos, not shots: one photo repeated is still one photo', () => {
+    const repeated = [...chosen(1), ...chosen(1), ...chosen(1), ...chosen(1), ...chosen(1)];
+    expect(() => buildPlan(repeated, beatmap, 20_000)).toThrow(/you have 1/);
+  });
+
+  it('does not change what the older looks cut from five photos or more', () => {
+    for (const look of ['classic', 'zoom-punch', 'cinematic'] as const) {
+      expect(() => buildPlan(chosen(5), beatmap, 20_000, 0, look)).not.toThrow();
+    }
+  });
+});
+
+describe('kenBurnsFor variants', () => {
+  it('moves the same way as before when no variant is asked for', () => {
+    const style = { fit: 'contain', zoom: 1.1 } as const;
+    expect(kenBurnsFor(3, 4000, 3000, { ...style, variant: 0 })).toEqual(
+      kenBurnsFor(3, 4000, 3000, style),
+    );
+  });
+
+  it('zooms further on a later pass and stays inside the photo', () => {
+    const first = kenBurnsFor(0, 4000, 3000, { fit: 'contain', zoom: 1.1, variant: 0 });
+    const later = kenBurnsFor(0, 4000, 3000, { fit: 'contain', zoom: 1.1, variant: 2 });
+    expect(later.to.w).toBeLessThan(first.to.w);
+    for (const r of [later.from, later.to]) {
+      expect(r.x).toBeGreaterThanOrEqual(0);
+      expect(r.x + r.w).toBeLessThanOrEqual(1 + 1e-9);
+    }
   });
 });
