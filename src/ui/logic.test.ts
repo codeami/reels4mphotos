@@ -6,10 +6,11 @@ import {
   groupLeftOut,
   isHeic,
   move,
+  planLine,
   shotIndexAt,
   toggle,
 } from './logic';
-import type { PhotoScore, ReelPlan } from './seams/types';
+import type { BeatMap, PhotoScore, ReelPlan, ReelShot } from './seams/types';
 
 const r = { x: 0, y: 0, w: 1, h: 1 };
 const plan = (starts: number[]): ReelPlan => ({
@@ -168,5 +169,34 @@ describe('left-out wording', () => {
   it('never says "blurry" and shows no raw number', () => {
     expect(dropReasonText('blurry')).not.toMatch(/blurry/i);
     expect(dropReasonText('blurry')).not.toMatch(/\d/);
+  });
+});
+
+describe('planLine', () => {
+  const beatmap: BeatMap = { version: 1, trackId: 't', durationMs: 30_000, bpm: 120, beatsMs: [] };
+  const shots = (lengths: number[]): ReelPlan => {
+    let at = 0;
+    return {
+      ...plan([]),
+      totalMs: lengths.reduce((a, b) => a + b, 0),
+      shots: lengths.map((durationMs, i) => {
+        const startMs = at;
+        at += durationMs;
+        return { ...plan([startMs]).shots.flat()[0], photoId: `p${i}`, durationMs } as ReelShot;
+      }),
+    };
+  };
+
+  it('lists each shot in beats of the track', () => {
+    expect(planLine(shots([500, 500, 1000, 2000]), beatmap)).toBe(
+      '4 shots, 4.0s in all: 1 beat, 1 beat, 2 beats, 4 beats.',
+    );
+  });
+
+  it('shows the first twelve and says there is more', () => {
+    const line = planLine(shots(Array(20).fill(500)), beatmap);
+    expect(line.startsWith('20 shots, 10.0s in all: 1 beat, ')).toBe(true);
+    expect(line.endsWith('1 beat, ….')).toBe(true);
+    expect(line.split(', ')).toHaveLength(14);
   });
 });

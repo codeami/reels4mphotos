@@ -20,5 +20,6 @@ export type {
   LookId,
   LookPlanning,
   Punch,
+  Structure,
   ZoomThrough,
 } from './types';

@@ -1,6 +1,6 @@
 # Looks
 
-A look is how a reel is cut and drawn. The photos, their order and the music beats stay the same; the look changes the cut length, the motion, and what is drawn on top. A reel carries only the look's id (`ReelPlan.look`); the numbers live in `src/looks/looks.ts` as plain data, shared by the planner (`src/curation/plan.ts`), the renderer (`src/render/frames/`) and the preview.
+A look is how a reel is cut and drawn. The photos, their order and the music beats stay the same; the look changes the cut length, the motion, and what is drawn on top. A reel carries only the look's id (`ReelPlan.look`); the numbers live in one JSON recipe per look in `src/looks/recipes/`, shared by the planner (`src/curation/plan.ts`), the renderer (`src/render/frames/`) and the preview.
 
 Everything is canvas 2D on the device. No text, no font, no image or video file, no dependency, no network call, no model. `ctx.filter` is not used (Safari support is doubtful); the blurred fill is made by shrinking and scaling up.
 
@@ -28,12 +28,64 @@ Left out on purpose, because they need text or a font: the date stamp (photo dum
 
 ## The single-photo looks
 
-Nothing here uses a model, `ctx.filter`, `shadowBlur` or a pixel loop over the whole frame per frame. All numbers are data in `src/looks/looks.ts`; the drawing is small pure functions with unit tests (`edges.test.ts`, `zoom-through.test.ts`, `glitch.test.ts`).
+Nothing here uses a model, `ctx.filter`, `shadowBlur` or a pixel loop over the whole frame per frame. All numbers are data in `src/looks/recipes/*.json`; the drawing is small pure functions with unit tests (`edges.test.ts`, `zoom-through.test.ts`, `glitch.test.ts`).
 
 - **Edge detection is plain image maths, not a model.** For each photo, once: shrink it to 256 px wide, take the grey level of each pixel, run the Sobel operator (two 3x3 sums that measure how fast the grey level changes), keep what is above a threshold (a fraction of the strong-edge level of that photo, the 99th percentile), thicken by a pixel, tint. The result is a small canvas of light lines, cached per photo (`EdgeSet`, 4 entries). Per frame it is only drawn: a soft glow (a 40 px copy scaled up), the lines, and the growing copies, all added with `'lighter'` over a dimmed photo. Nothing finds a person or cuts one out; the outline follows every strong edge in the picture. A person-cutout model is a later decision.
 - **Zoom through:** level k is the photo at `inner`^k of the frame, the stack grows by one level over the shot, so at the end level 1 sits where level 0 started. Each level is one `drawImage`.
 - **Glitch slice:** the whole photo is drawn once; each moving strip is redrawn as three one-colour copies (black fill, photo, `'multiply'` by red, green or blue, added with `'lighter'`) on a small scratch canvas the height of a strip. Which strips move comes from a seeded generator (shot number, frame age), so a frame is still a pure function of the plan.
 - **Photo count:** a look declares `minPhotos` (absent means 5). `buildPlan` refuses fewer different photos with "Cinematic needs at least 5 photos (you have 3)." and the render refuses such a plan before any encoder starts (`assertEnoughPhotos`). With one photo the planner repeats it on the beat (`maxPasses` 40, `varyRepeats`: each repeat gets a different zoom and pan), and if the beat map is too sparse it cuts every `fallbackCutMs`. In the app, if fewer photos are chosen than the current look needs, the first look that works is selected, and the chips that need more photos are greyed out with how many.
+
+## Recipes (the looks as JSON)
+
+Each look is one file, `src/looks/recipes/<id>.json`. Nothing about a look is written in TypeScript any more except the order of the chips (`LOOK_ORDER` in `src/looks/looks.ts`) and the code that draws it.
+
+- **Format:** `reel-recipe/1`, described by `src/looks/recipe.schema.json`. It is the shape of the `Look` type (`src/looks/types.ts`), with a `schema` tag. It is not the demo's `reel-recipe/0` format: that one could not say edge pulse, zoom through, glitch or a colour backdrop, and the looks must stay exactly as they were.
+- **Checking:** `src/looks/validate.ts` (about 50 lines, no dependency) reads the schema and checks type, enum, range, required and unknown fields. `src/looks/load.ts` runs it on every recipe when the app starts and also checks that the id matches the file name, that `cutBeats` is in order and that a look has at most one of edge pulse, zoom through and glitch. A bad file stops the app with a message like `Recipe ./recipes/flash-cut.json: $.flash.peak: 4 > 1`.
+- **Adding a look:** the file list is written out in `looks.ts` (so Node, which runs the e2e specs, can read it), and `LookId` in `src/types/reel-plan.ts` names the ids. A recipe file with no entry in `LOOK_ORDER` fails `recipes.test.ts`.
+- **Proof they did not change:** `legacy-looks.fixture.ts` holds the old TypeScript values, frozen, and `recipes.test.ts` checks every recipe equals them. The existing unit and end-to-end tests pass unchanged.
+
+### Structure (the shape of a reel)
+
+A recipe may carry a `structure` section so it describes a reel format and not only an effect. No shipped look has one yet, so every look is cut exactly as before; the section is there for the next recipes.
+
+```json
+"structure": {
+  "hook":   { "unit": "seconds", "length": 3, "beatsPerPhoto": 1, "bestPhoto": true },
+  "beats":  [ { "name": "build", "beatsPerPhoto": 2, "photos": 3 }, { "name": "settle", "beatsPerPhoto": 4 } ],
+  "payoff": { "beatsPerPhoto": 6, "bestPhoto": true },
+  "textSlots": []
+}
+```
+
+- **Hook:** the opening window, in seconds or beats, with the beats each photo stays on screen in it (1 to 2 suits a fast montage, 2 to 4 a family reel).
+- **Beats:** the middle sections in order. A section takes `photos` shots; the last one takes the rest.
+- **Payoff:** the last shot, held for its beats.
+- **Best frame:** with `bestPhoto` on the hook, the photo with the highest score plays first; on the payoff, the best one not already used plays last. Without scores the reel order is kept.
+- **Text slots:** must be an empty list. No text is drawn.
+- **Planner (`src/curation/structure.ts`):** shots keep coming, going round the photos again (up to the look's `maxPasses`), until the reel reaches the length asked for with the payoff on the end. Every cut is on a beat. If the beat map is too short to carry it, the planner cuts the way the look always did. The recipe is a plan for a format; it clones the pacing, not any video.
+
+## Choosing the photos
+
+Done before a look is involved, in `src/curation/`. Plain image maths on a copy of each photo shrunk to 512 px, on the device, in a worker: no model, no network, nothing kept but numbers.
+
+- **Sharpness:** variance of the Laplacian of the grey copy (`sharpness.ts`). Low means soft.
+- **Exposure:** how much of the grey histogram is crushed to black or blown to white (`exposure.ts`).
+- **Near-duplicates:** a 64-bit difference hash of each photo; two photos within 10 bits are the same shot, and the better one stays (`dhash.ts`, `dedupe.ts`).
+- **Quality:** one 0 to 1 figure from the first two (`score.ts`). The best ten are chosen with a spread across time (`select.ts`). The figure is handed to the planner so a structured recipe can put the best frame first or last.
+- **Optional dropping:** the review screen has a tick box, on by default, "Leave out soft, dark, bright and repeat photos". Unticked, those photos stay in the running (`keepWeak`); they are still scored and ranked. Unreadable files are always left out.
+- **What was skipped, and why:** the next screen lists every photo left out under a plain reason ("Might be a little soft", "On the dark side", "On the bright side", "Similar to a photo in your reel", "Good, but no room"), and any can be put back.
+- **Cached per photo:** each photo is measured once, when the set is chosen. The numbers stay with the photo in the app's memory, so changing the look, the song or the length never measures again. Nothing is stored between visits.
+
+### Time on a 12-photo set
+
+Measured once through the real app (desktop Chromium on the captain's Intel Mac, 12 synthetic 3072 px scene photos, Classic look, default track, nothing else running; rough, not repeated):
+
+- Choosing: from Done on the review grid to the preview on screen, 1.14 s in all, about 95 ms per photo. That covers decoding to 512 px, scoring (sharpness, exposure, fingerprint), picking, planning and building the preview. Scoring alone was not timed apart from the rest.
+- Export: 83.8 s for a 19.7 s reel (about 7 s of export per photo in the set, about 140 ms per frame), the same order as the Classic row in the Speed table.
+
+## The plan line
+
+Under the preview, "Plan: 12 shots, 20.0s in all: 1 beat, 1 beat, 2 beats, ..." lists the planned cuts in beats of the chosen track (the first twelve). It is the same plan the export renders (`planLine` in `src/ui/logic.ts`).
 
 ## How cuts are counted
 

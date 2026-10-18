@@ -111,3 +111,14 @@ test('with the option off, an export keeps its music and shows no silent note', 
   await expect(page.getByRole('heading', { name: 'Your reel is ready' })).toBeVisible();
   await expect(page.getByTestId('silent-hint')).toHaveCount(0);
 });
+
+test('a plan line under the reel lists the planned cuts, and follows the look', async ({
+  page,
+}) => {
+  const line = page.getByTestId('plan-line');
+  await expect(line).toHaveText(/^Plan: \d+ shots, \d+\.\ds in all: \d+(\.5)? beats?, /);
+  const classic = await line.textContent();
+  await page.getByTestId('look-zoom-punch').click();
+  await expect(watchIt(page)).toBeVisible();
+  await expect(page.getByTestId('plan-line')).not.toHaveText(classic ?? '');
+});

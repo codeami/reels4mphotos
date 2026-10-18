@@ -1,0 +1,43 @@
+{
+  "schema": "reel-recipe/1",
+  "id": "neon-edge-pulse",
+  "name": "Neon edge",
+  "blurb": "A glowing outline of the photo pulses outwards on the beat.",
+  "fit": "contain",
+  "backdrop": "blur",
+  "crossfadeFrames": 0,
+  "crossfadeEasing": "linear",
+  "planning": {
+    "cutBeats": [1, 2],
+    "maxPasses": 40,
+    "crossfade": "none",
+    "kenBurnsZoom": 1.08,
+    "fallbackCutMs": 750,
+    "varyRepeats": true
+  },
+  "minPhotos": 1,
+  "punch": null,
+  "flash": null,
+  "shake": 0,
+  "grain": 0,
+  "vignette": 0.45,
+  "letterbox": 0,
+  "grade": [],
+  "edgePulse": {
+    "mapWidth": 256,
+    "threshold": 0.22,
+    "softness": 0.3,
+    "thicken": 1,
+    "dim": 0.6,
+    "lineColor": "#d9fbff",
+    "glowColor": "#14b8ff",
+    "baseAlpha": 0.5,
+    "peakAlpha": 1,
+    "glowAlpha": 0.55,
+    "rings": 2,
+    "ringDelayFrames": 3,
+    "ringFrames": 16,
+    "maxExpand": 0.16,
+    "ringPeak": 0.85
+  }
+}

@@ -92,6 +92,23 @@ export function groupLeftOut<T extends { score: PhotoScore }>(
   });
 }
 
+const PLAN_LINE_CUTS = 12;
+
+/**
+ * The planned cuts in plain words, before export: how long each shot stays, in beats of the
+ * chosen track. Long plans show the first dozen.
+ */
+export function planLine(plan: ReelPlan, beatmap: BeatMap): string {
+  const beatMs = 60_000 / beatmap.bpm;
+  const lengths = plan.shots.map((s) => {
+    const beats = Math.round((s.durationMs / beatMs) * 2) / 2;
+    return `${beats} ${beats === 1 ? 'beat' : 'beats'}`;
+  });
+  const shown = lengths.slice(0, PLAN_LINE_CUTS).join(', ');
+  const more = lengths.length > PLAN_LINE_CUTS ? ', …' : '';
+  return `${plan.shots.length} shots, ${formatSeconds(plan.totalMs)} in all: ${shown}${more}.`;
+}
+
 export interface LengthOption {
   id: 'short' | 'standard' | 'long';
   label: string;

@@ -1,5 +1,5 @@
 import { h } from '../dom';
-import { cutsOnBeat, formatSeconds, shotIndexAt } from '../logic';
+import { cutsOnBeat, formatSeconds, planLine, shotIndexAt } from '../logic';
 import { Player } from '../player';
 import type { BeatMap, ReelPlan } from '../seams/types';
 
@@ -108,6 +108,7 @@ export function previewScreen(
       { class: 'lede small' },
       `Tick marks are beats; bright marks are cuts. ${beatmap.bpm} BPM.`,
     ),
+    h('p', { class: 'lede small', 'data-testid': 'plan-line' }, `Plan: ${planLine(plan, beatmap)}`),
     ...extras,
   );
   return { el, destroy: () => player.destroy() };

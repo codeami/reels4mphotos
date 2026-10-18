@@ -2,6 +2,7 @@ import { DEFAULT_LOOK, LOOKS, photoShortfall, type LookPlanning } from '../looks
 import type { LookId, Rect, ReelPlan, ReelShot, Transition } from '../types/reel-plan';
 import type { BeatMap, PlanPhoto } from './types';
 import { must } from './must';
+import { structuredEnds } from './structure';
 
 export const MIN_REEL_MS = 15_000;
 export const MAX_REEL_MS = 30_000;
@@ -194,14 +195,27 @@ export function buildPlan(
         chosen.length * look.planning.maxPasses,
       )
     : chosen.length;
+  // A recipe with a structure is cut to it when the beat map can carry it.
+  const structured = look.structure
+    ? structuredEnds(
+        chosen,
+        look.structure,
+        look.planning.maxPasses,
+        target,
+        ceiling,
+        beatmap.beatsMs,
+        MIN_BEAT_COVER,
+      )
+    : null;
   const ends =
-    (look.planning.cutBeats &&
-      beatShotEnds(chosen.length, target, ceiling, beatmap.beatsMs, look.planning)) ||
+    (structured?.ends ??
+      (look.planning.cutBeats &&
+        beatShotEnds(chosen.length, target, ceiling, beatmap.beatsMs, look.planning))) ||
     shotEnds(evenCount, target, ceiling, Math.min(MIN_REEL_MS, ceiling), beatmap.beatsMs);
 
   // More cuts than photos means the set is gone through again, in the same order.
   const shots: ReelShot[] = ends.map((end, i) => {
-    const photo = must(chosen[i % chosen.length]);
+    const photo = must(structured ? structured.photos[i] : chosen[i % chosen.length]);
     const startMs = i === 0 ? 0 : must(ends[i - 1]);
     return {
       photoId: photo.photoId,

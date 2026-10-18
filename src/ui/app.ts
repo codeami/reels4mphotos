@@ -105,7 +105,10 @@ export function createApp(root: HTMLElement, engines: Engines) {
     }
     store.set({ busy: 'Choosing your best shots…', skipped });
     try {
-      const result = await engines.select(files, { targetCount: TARGET_COUNT });
+      const result = await engines.select(files, {
+        targetCount: TARGET_COUNT,
+        keepWeak: !store.get().dropWeak,
+      });
       revokePhotoUrls(store.get());
       const photos: Photo[] = result.scores
         .flatMap((score) => {
@@ -227,7 +230,16 @@ export function createApp(root: HTMLElement, engines: Engines) {
     try {
       const chosen = s.order.flatMap((id) => {
         const photo = s.photos.find((p) => p.id === id);
-        return photo ? [{ photoId: id, width: photo.score.width, height: photo.score.height }] : [];
+        return photo
+          ? [
+              {
+                photoId: id,
+                width: photo.score.width,
+                height: photo.score.height,
+                quality: photo.score.quality,
+              },
+            ]
+          : [];
       });
       const plan = engines.plan(
         chosen,
@@ -449,7 +461,10 @@ export function createApp(root: HTMLElement, engines: Engines) {
   function screenFor(s: State): HTMLElement {
     switch (s.step) {
       case 'review':
-        return reviewScreen(s.staged, thumbs, { onToggle: onReviewToggle });
+        return reviewScreen(s.staged, thumbs, s.dropWeak, {
+          onToggle: onReviewToggle,
+          onDropWeak: (dropWeak) => store.set({ dropWeak }),
+        });
       case 'pick':
         return pickScreen(s, { onToggle, onMove });
       case 'track':

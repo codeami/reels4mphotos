@@ -1,0 +1,23 @@
+{
+  "schema": "reel-recipe/1",
+  "id": "classic",
+  "name": "Classic",
+  "blurb": "Soft fades and slow drifts. The original.",
+  "fit": "cover",
+  "backdrop": "black",
+  "crossfadeFrames": 10,
+  "crossfadeEasing": "linear",
+  "planning": {
+    "cutBeats": null,
+    "maxPasses": 1,
+    "crossfade": "default",
+    "kenBurnsZoom": 1.2
+  },
+  "punch": null,
+  "flash": null,
+  "shake": 0,
+  "grain": 0,
+  "vignette": 0,
+  "letterbox": 0,
+  "grade": []
+}
