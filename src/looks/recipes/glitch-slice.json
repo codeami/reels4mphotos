@@ -1,0 +1,33 @@
+{
+  "schema": "reel-recipe/1",
+  "id": "glitch-slice",
+  "name": "Glitch slice",
+  "blurb": "The photo tears into strips on the beat and snaps back.",
+  "fit": "cover",
+  "backdrop": "black",
+  "crossfadeFrames": 0,
+  "crossfadeEasing": "linear",
+  "planning": {
+    "cutBeats": [1, 1],
+    "maxPasses": 40,
+    "crossfade": "none",
+    "kenBurnsZoom": 1.1,
+    "fallbackCutMs": 500,
+    "varyRepeats": true
+  },
+  "minPhotos": 1,
+  "punch": null,
+  "flash": null,
+  "shake": 0,
+  "grain": 0.07,
+  "vignette": 0.3,
+  "letterbox": 0,
+  "grade": [],
+  "glitch": {
+    "strips": 14,
+    "peak": 0.1,
+    "frames": 9,
+    "share": 0.6,
+    "chroma": 0.4
+  }
+}

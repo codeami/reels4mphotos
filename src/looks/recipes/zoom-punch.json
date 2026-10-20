@@ -1,0 +1,29 @@
+{
+  "schema": "reel-recipe/1",
+  "id": "zoom-punch",
+  "name": "Zoom punch",
+  "blurb": "A quick push-in on every beat.",
+  "fit": "contain",
+  "backdrop": "blur",
+  "crossfadeFrames": 0,
+  "crossfadeEasing": "linear",
+  "planning": {
+    "cutBeats": [1, 1],
+    "maxPasses": 3,
+    "crossfade": "none",
+    "kenBurnsZoom": 1.06
+  },
+  "punch": {
+    "from": 1,
+    "to": 1.12,
+    "frames": 6,
+    "easing": "ease-out-cubic",
+    "driftPerSec": 0.02
+  },
+  "flash": null,
+  "shake": 0,
+  "grain": 0,
+  "vignette": 0.35,
+  "letterbox": 0,
+  "grade": []
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "reel-recipe/1",
+  "id": "photo-dump",
+  "name": "Photo dump",
+  "blurb": "Fast, casual, a little shaky.",
+  "fit": "contain",
+  "backdrop": "colour",
+  "crossfadeFrames": 0,
+  "crossfadeEasing": "linear",
+  "planning": {
+    "cutBeats": [1, 2],
+    "maxPasses": 3,
+    "crossfade": "none",
+    "kenBurnsZoom": 1.03
+  },
+  "punch": null,
+  "flash": null,
+  "shake": 0.004,
+  "grain": 0.05,
+  "vignette": 0,
+  "letterbox": 0,
+  "grade": [
+    {
+      "op": "soft-light",
+      "color": "#ffd9a0",
+      "alpha": 0.2
+    }
+  ]
+}

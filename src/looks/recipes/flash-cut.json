@@ -1,0 +1,32 @@
+{
+  "schema": "reel-recipe/1",
+  "id": "flash-cut",
+  "name": "Flash cut",
+  "blurb": "A white flash on every cut.",
+  "fit": "contain",
+  "backdrop": "blur",
+  "crossfadeFrames": 0,
+  "crossfadeEasing": "linear",
+  "planning": {
+    "cutBeats": [1, 1],
+    "maxPasses": 3,
+    "crossfade": "none",
+    "kenBurnsZoom": 1.04
+  },
+  "punch": {
+    "from": 1.05,
+    "to": 1,
+    "frames": 4,
+    "easing": "linear",
+    "driftPerSec": 0
+  },
+  "flash": {
+    "peak": 0.8,
+    "frames": 4
+  },
+  "shake": 0,
+  "grain": 0.05,
+  "vignette": 0.4,
+  "letterbox": 0,
+  "grade": []
+}

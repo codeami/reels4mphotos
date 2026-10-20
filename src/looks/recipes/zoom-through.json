@@ -1,0 +1,34 @@
+{
+  "schema": "reel-recipe/1",
+  "id": "zoom-through",
+  "name": "Zoom through",
+  "blurb": "The photo opens up to reveal itself inside itself.",
+  "fit": "cover",
+  "backdrop": "black",
+  "crossfadeFrames": 0,
+  "crossfadeEasing": "linear",
+  "planning": {
+    "cutBeats": [2, 2],
+    "maxPasses": 40,
+    "crossfade": "none",
+    "kenBurnsZoom": 1.06,
+    "fallbackCutMs": 1000,
+    "varyRepeats": true
+  },
+  "minPhotos": 1,
+  "punch": null,
+  "flash": {
+    "peak": 0.65,
+    "frames": 5
+  },
+  "shake": 0,
+  "grain": 0,
+  "vignette": 0.3,
+  "letterbox": 0,
+  "grade": [],
+  "zoomThrough": {
+    "inner": 0.5,
+    "minScale": 0.06,
+    "border": 0.005
+  }
+}

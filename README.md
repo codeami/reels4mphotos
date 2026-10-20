@@ -20,10 +20,10 @@ Someone with a camera roll full of trip / event photos who wants a reel to post 
 ## MVP (core loop)
 
 1. **Add photos** — choose 5–50 photos from the device (file picker / iOS photo sheet). Three looks (Neon edge, Zoom through, Glitch slice) also work with fewer, down to a single photo.
-2. **Auto-select** — the app picks the best ~10 on-device: drops blurry, badly exposed and near-duplicate shots, keeps a spread across time. The user can toggle any photo in or out and drag to reorder.
+2. **Auto-select** — the app picks the best ~10 on-device: scores each photo with plain image maths (sharpness, how much of the picture is crushed or blown out, a tiny fingerprint to spot near-duplicates; no model), drops soft, badly exposed and near-duplicate shots, keeps a spread across time. A tick box on the review screen turns the dropping off. Everything left out is listed with a plain reason. The user can toggle any photo in or out and drag to reorder.
 3. **Pick a beat** — one of 3 bundled royalty-free tracks, each with a pre-computed beat map.
 4. **Preview** — 1080×1920, 30 fps: Ken Burns pan/zoom on each photo, cuts land on beats, 2 transition styles. Target 15–30 s.
-5. **Pick a look** — a row of chips under the preview: Classic, Zoom punch, Flash cut, Cinematic, Photo dump, and the three single-photo looks (marked "works with one photo"). Each cuts and draws the same photos its own way (see `docs/looks.md`). No text, no fonts, all drawn on the device.
+5. **Pick a look** — a row of chips under the preview: Classic, Zoom punch, Flash cut, Cinematic, Photo dump, and the three single-photo looks (marked "works with one photo"). Each cuts and draws the same photos its own way (see `docs/looks.md`). Each look is a small JSON recipe file in `src/looks/recipes/`, checked against a schema when the app starts. Under the preview, one line lists the planned cuts in beats. No text, no fonts, all drawn on the device.
 6. **Export & share** — MP4 (H.264 + AAC) saved to the device or shared through the system share sheet. Or tick **Export without music** for a video-only MP4 and add a song inside Instagram when you post; the cuts still follow the beat of the track you chose.
 
 Everything runs in the browser. No account, no server, no network after the page loads.

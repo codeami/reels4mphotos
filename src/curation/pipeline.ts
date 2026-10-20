@@ -132,17 +132,16 @@ export async function runCuration(
   const survivors: PhotoScore[] = [];
   for (const s of scores) {
     if (!s.dropReason) {
-      s.dropReason = classify(
-        { sharpness: must(s.sharpness), exposure: must(s.exposure) },
-        thresholds,
-      );
+      s.dropReason = opts.keepWeak
+        ? null
+        : classify({ sharpness: must(s.sharpness), exposure: must(s.exposure) }, thresholds);
       if (!s.dropReason) survivors.push(s);
     }
   }
 
   const { kept, duplicateOf } = collapseDuplicates(
     survivors.map((s) => ({ id: s.photoId, quality: must(s.quality), hash: must(s.dHash) })),
-    thresholds.duplicateHamming,
+    opts.keepWeak ? -1 : thresholds.duplicateHamming,
   );
   for (const [dropped, keeper] of duplicateOf) {
     const s = must(byId.get(dropped));
@@ -172,7 +171,12 @@ export async function runCuration(
 
   opts.onProgress?.({ stage: 'done', done: files.length, total: files.length });
   return {
-    chosen: chosen.map((s) => ({ photoId: s.photoId, width: s.width, height: s.height })),
+    chosen: chosen.map((s) => ({
+      photoId: s.photoId,
+      width: s.width,
+      height: s.height,
+      quality: s.quality,
+    })),
     scores,
     timeline: summarise(scores),
   };

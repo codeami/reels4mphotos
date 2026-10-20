@@ -4,6 +4,7 @@ import type { Staged, Thumbs } from '../staging';
 
 export interface ReviewActions {
   onToggle: (id: number) => void;
+  onDropWeak: (dropWeak: boolean) => void;
 }
 
 /** Count line for the grid, e.g. "12 of 14 photos kept". */
@@ -11,7 +12,12 @@ export const keptSummary = (list: readonly Staged[]) =>
   `${list.filter((x) => x.kept).length} of ${list.length} photos kept`;
 
 /** Big tiles, two per row on a phone. Each tile is one tap target: tap to remove, tap again to keep. */
-export function reviewScreen(list: readonly Staged[], thumbs: Thumbs, a: ReviewActions) {
+export function reviewScreen(
+  list: readonly Staged[],
+  thumbs: Thumbs,
+  dropWeak: boolean,
+  a: ReviewActions,
+) {
   const kept = list.filter((x) => x.kept).length;
   const check = checkCount(kept, FEWEST_PHOTOS);
   return h(
@@ -25,6 +31,22 @@ export function reviewScreen(list: readonly Staged[], thumbs: Thumbs, a: ReviewA
       `Tap a photo to take it out. Tap it again to keep it. Keep ${MIN_PHOTOS} to ${MAX_PHOTOS}, or fewer for the single-photo looks.`,
     ),
     !check.ok && h('p', { class: 'notice', role: 'alert' }, check.message),
+    h(
+      'label',
+      { class: 'no-music' },
+      h('input', {
+        type: 'checkbox',
+        'data-testid': 'drop-weak',
+        checked: dropWeak,
+        onchange: (e: Event) => a.onDropWeak((e.target as HTMLInputElement).checked),
+      }),
+      h('span', { class: 'no-music-label' }, 'Leave out soft, dark, bright and repeat photos'),
+      h(
+        'p',
+        { class: 'no-music-help' },
+        'Untick to keep them in the running. Whatever is left out is listed with a reason, and you can put any back.',
+      ),
+    ),
     h(
       'ul',
       { class: 'review-grid', 'aria-label': 'Photos you picked' },

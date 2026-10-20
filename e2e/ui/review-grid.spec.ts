@@ -59,3 +59,16 @@ test('a tap removes a photo, a second tap keeps it; Done follows the count', asy
   await expect(page.locator('[data-review-tile]').first()).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('next')).toBeEnabled();
 });
+
+test('leaving out soft, dark, bright and repeat photos is a tick box, on by default', async ({
+  page,
+}) => {
+  await page.setInputFiles('#photo-input', await makePhotos(page, 9));
+  const box = page.getByTestId('drop-weak');
+  await expect(box).toBeChecked();
+  await box.uncheck();
+  await expect(box).not.toBeChecked();
+  // the choice is kept when the grid redraws after a tap on a photo
+  await page.locator('[data-review-tile]').first().click();
+  await expect(page.getByTestId('drop-weak')).not.toBeChecked();
+});

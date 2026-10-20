@@ -77,6 +77,24 @@ describe('runCuration', () => {
     expect(keeper.selected).toBe(true);
   });
 
+  it('keeps soft, bright and repeat photos in the running when asked, but still drops unreadable ones', async () => {
+    const { files, pixels } = scenario();
+    const res = await runCuration(files, { targetCount: 10, keepWeak: true }, stubDeps(pixels));
+    const reasons = res.scores.map((s) => s.dropReason).filter(Boolean);
+    expect(reasons).toEqual(['decode-failed']);
+    expect(res.scores.filter((s) => s.selected)).toHaveLength(9);
+  });
+
+  it('hands the score of each chosen photo to the planner', async () => {
+    const { files, pixels } = scenario();
+    const res = await runCuration(files, {}, stubDeps(pixels));
+    for (const c of res.chosen) {
+      const score = must(res.scores.find((s) => s.photoId === c.photoId));
+      expect(c.quality).toBe(score.quality);
+      expect(c.quality).toBeGreaterThan(0);
+    }
+  });
+
   it('selects every survivor when fewer than N remain, and chooses exactly those', async () => {
     const { files, pixels } = scenario();
     const res = await runCuration(files, { targetCount: 10 }, stubDeps(pixels));

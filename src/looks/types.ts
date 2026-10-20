@@ -96,6 +96,21 @@ export interface Glitch {
   chroma: number;
 }
 
+// The shape of a reel, for a recipe that describes a format and not only an effect. Used by the
+// planner (src/curation/plan.ts); a look without one is cut as it always was. Counts are beats of
+// the chosen track.
+export interface Structure {
+  // The opening window: how long it lasts and how many beats each photo stays on screen in it.
+  // `bestPhoto` puts the highest scoring photo first.
+  hook: { unit: 'seconds' | 'beats'; length: number; beatsPerPhoto: number; bestPhoto?: boolean };
+  // The middle, in order. A section takes `photos` photos (the last one takes whatever is left).
+  beats: readonly { name: string; beatsPerPhoto: number; photos?: number }[];
+  // The last shot, held for `beatsPerPhoto` beats. `bestPhoto` puts the highest scoring photo there.
+  payoff: { beatsPerPhoto: number; bestPhoto?: boolean };
+  // Places for words. Always empty: nothing draws text yet.
+  textSlots: readonly never[];
+}
+
 // Everything a look does, as data. Sizes are fractions of the frame so one look serves the
 // 1080x1920 export and the smaller preview alike.
 export interface Look {
@@ -124,4 +139,5 @@ export interface Look {
   edgePulse?: EdgePulse;
   zoomThrough?: ZoomThrough;
   glitch?: Glitch;
+  structure?: Structure;
 }

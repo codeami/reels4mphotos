@@ -50,6 +50,7 @@ export interface State {
   lengthMs: number; // target reel length; the plan clamps it to what the track can carry
   look: LookId; // how the reel is cut and drawn; written into the plan and used by the export
   withoutMusic: boolean; // export the video with no music, to add a song inside Instagram
+  dropWeak: boolean; // leave out soft, badly exposed and repeat photos when choosing (on by default)
   exp: ExportState;
   rating: RatingState;
   confirmClear: boolean; // the "clear app copies" question is open
@@ -71,6 +72,7 @@ export const initialState = (): State => ({
   lengthMs: DEFAULT_LENGTH_MS,
   look: DEFAULT_LOOK,
   withoutMusic: false,
+  dropWeak: true,
   exp: { kind: 'idle' },
   rating: initialRating(),
   confirmClear: false,

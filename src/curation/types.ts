@@ -42,6 +42,12 @@ export interface SelectOptions {
   /** Stable ids, one per file. Default `photo-<index>`. */
   photoIds?: string[];
   thresholds?: Partial<Thresholds>;
+  /**
+   * Keep soft, badly exposed and near-duplicate photos in the running. They are still scored and
+   * ranked, so the best `targetCount` are chosen as usual; only the hard drops are skipped.
+   * Photos that cannot be decoded are always dropped.
+   */
+  keepWeak?: boolean;
   onProgress?: (p: CurateProgress) => void;
 }
 
@@ -99,6 +105,8 @@ export interface PlanPhoto {
   /** Original pixel size; omit when unknown. */
   width?: number;
   height?: number;
+  /** 0..1 score from the photo scorer; a recipe's structure uses it to put the best frame first or last. */
+  quality?: number;
 }
 
 export interface SelectResult {

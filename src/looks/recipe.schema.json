@@ -1,0 +1,196 @@
+{
+  "$id": "reel-recipe/1",
+  "title": "Reel look recipe, v1",
+  "description": "A look as plain data: how a reel is cut and drawn, and (optionally) the shape of the reel. Checked by src/looks/validate.ts, which reads only the keywords used here: type, enum, required, properties, additionalProperties, items, minimum, maximum, minItems, maxItems, minLength, pattern.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "name",
+    "blurb",
+    "fit",
+    "backdrop",
+    "crossfadeFrames",
+    "crossfadeEasing",
+    "planning",
+    "punch",
+    "flash",
+    "shake",
+    "grain",
+    "vignette",
+    "letterbox",
+    "grade"
+  ],
+  "properties": {
+    "schema": { "enum": ["reel-recipe/1"] },
+    "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "name": { "type": "string", "minLength": 1 },
+    "blurb": { "type": "string", "minLength": 1 },
+    "fit": { "enum": ["cover", "contain"] },
+    "backdrop": { "enum": ["black", "blur", "colour"] },
+    "crossfadeFrames": { "type": "integer", "minimum": 0, "maximum": 60 },
+    "crossfadeEasing": { "enum": ["linear", "ease-out-cubic", "smoothstep"] },
+    "minPhotos": { "type": "integer", "minimum": 1, "maximum": 30 },
+    "planning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cutBeats", "maxPasses", "crossfade", "kenBurnsZoom"],
+      "properties": {
+        "cutBeats": {
+          "type": ["array", "null"],
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "integer", "minimum": 1, "maximum": 16 }
+        },
+        "maxPasses": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "crossfade": { "enum": ["default", "all", "none"] },
+        "kenBurnsZoom": { "type": "number", "minimum": 1, "maximum": 2 },
+        "fallbackCutMs": { "type": "number", "minimum": 100, "maximum": 5000 },
+        "varyRepeats": { "type": "boolean" }
+      }
+    },
+    "punch": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["from", "to", "frames", "easing", "driftPerSec"],
+      "properties": {
+        "from": { "type": "number", "minimum": 0.5, "maximum": 2 },
+        "to": { "type": "number", "minimum": 0.5, "maximum": 2 },
+        "frames": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "easing": { "enum": ["linear", "ease-out-cubic", "smoothstep"] },
+        "driftPerSec": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "flash": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["peak", "frames"],
+      "properties": {
+        "peak": { "type": "number", "minimum": 0, "maximum": 1 },
+        "frames": { "type": "integer", "minimum": 1, "maximum": 60 }
+      }
+    },
+    "shake": { "type": "number", "minimum": 0, "maximum": 0.05 },
+    "grain": { "type": "number", "minimum": 0, "maximum": 1 },
+    "vignette": { "type": "number", "minimum": 0, "maximum": 1 },
+    "letterbox": { "type": "number", "minimum": 0, "maximum": 0.3 },
+    "grade": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["op", "color", "alpha"],
+        "properties": {
+          "op": { "enum": ["source-over", "multiply", "soft-light", "screen", "overlay"] },
+          "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+          "alpha": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "edgePulse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mapWidth",
+        "threshold",
+        "softness",
+        "thicken",
+        "dim",
+        "lineColor",
+        "glowColor",
+        "baseAlpha",
+        "peakAlpha",
+        "glowAlpha",
+        "rings",
+        "ringDelayFrames",
+        "ringFrames",
+        "maxExpand",
+        "ringPeak"
+      ],
+      "properties": {
+        "mapWidth": { "type": "integer", "minimum": 32, "maximum": 1024 },
+        "threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "softness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "thicken": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "dim": { "type": "number", "minimum": 0, "maximum": 1 },
+        "lineColor": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "glowColor": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "baseAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "peakAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "glowAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "rings": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "ringDelayFrames": { "type": "integer", "minimum": 0, "maximum": 60 },
+        "ringFrames": { "type": "integer", "minimum": 1, "maximum": 120 },
+        "maxExpand": { "type": "number", "minimum": 0, "maximum": 1 },
+        "ringPeak": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "zoomThrough": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inner", "minScale", "border"],
+      "properties": {
+        "inner": { "type": "number", "minimum": 0.1, "maximum": 0.95 },
+        "minScale": { "type": "number", "minimum": 0.01, "maximum": 1 },
+        "border": { "type": "number", "minimum": 0, "maximum": 0.05 }
+      }
+    },
+    "glitch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strips", "peak", "frames", "share", "chroma"],
+      "properties": {
+        "strips": { "type": "integer", "minimum": 2, "maximum": 64 },
+        "peak": { "type": "number", "minimum": 0, "maximum": 0.5 },
+        "frames": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "share": { "type": "number", "minimum": 0, "maximum": 1 },
+        "chroma": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hook", "beats", "payoff", "textSlots"],
+      "description": "The shape of the reel, not only of an effect. Absent means the planner cuts as it always has. The hook is the opening window; beats are the middle sections in order; the payoff is the last shot. beatsPerPhoto is how many beats one photo stays on screen. textSlots must stay empty: no text is drawn yet.",
+      "properties": {
+        "hook": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["unit", "length", "beatsPerPhoto"],
+          "properties": {
+            "unit": { "enum": ["seconds", "beats"] },
+            "length": { "type": "number", "minimum": 0.5, "maximum": 30 },
+            "beatsPerPhoto": { "type": "integer", "minimum": 1, "maximum": 16 },
+            "bestPhoto": { "type": "boolean" }
+          }
+        },
+        "beats": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "beatsPerPhoto"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "beatsPerPhoto": { "type": "integer", "minimum": 1, "maximum": 16 },
+              "photos": { "type": "integer", "minimum": 1, "maximum": 30 }
+            }
+          }
+        },
+        "payoff": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["beatsPerPhoto"],
+          "properties": {
+            "beatsPerPhoto": { "type": "integer", "minimum": 1, "maximum": 16 },
+            "bestPhoto": { "type": "boolean" }
+          }
+        },
+        "textSlots": { "type": "array", "maxItems": 0 }
+      }
+    }
+  }
+}
