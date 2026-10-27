@@ -6,10 +6,10 @@ Run by Claude (Cowork) on 2026-10-01 from public sources. Each answer ends with 
 
 - Safari 26.0 added `AudioEncoder` / `AudioDecoder`. Video encoding (`VideoEncoder`) shipped earlier. Source: WebKit, "WebKit Features in Safari 26.0".
 - Existing proof: an iOS 26 PWA (kimymt/iphone-video-compressor) encodes H.264/HEVC video and re-encodes audio with `AudioEncoder`, all on-device.
-- AAC encoding in Safari isn't explicitly documented. Treat it as likely but unproven.
+- AAC encoding in Safari isn't explicitly documented, but it is confirmed on device: iPhone 15 Pro Max (iPhone16,2), iOS 26.6.2, Safari 26.6.1, 2026-10-01 (see Answer below).
 - **Decision:** H.264 (`avc1.640028`, High@4.0) at 1080×1920 / 30 fps + AAC-LC 128 kbps. Min target: iOS 26 Safari.
 - **Verify:** `VideoEncoder.isConfigSupported` and `AudioEncoder.isConfigSupported` for exactly these configs on the captain's iPhone. If AAC fails, fallback order: (a) Opus in MP4 if supported, (b) MediaRecorder capturing canvas + audio graph, (c) silent video with a "add sound in Instagram" hint.
-- **Answer (checked 2026-10-01, captain's iPhone):** `VideoEncoder.isConfigSupported` for avc1.640028 at 1080x1920/30 and `AudioEncoder.isConfigSupported` for AAC-LC both returned supported. AAC is confirmed, not merely likely; the fallbacks above are not needed.
+- **Answer (checked 2026-10-01, iPhone 15 Pro Max, iPhone16,2, iOS 26.6.2, Safari 26.6.1, real device over USB with Safari Web Inspector):** `VideoEncoder.isConfigSupported` for avc1.640028 at 1080x1920/30 and `AudioEncoder.isConfigSupported` for AAC-LC mp4a.40.2 128k both returned supported (Opus and MediaRecorder video/mp4 avc1+aac also supported). AAC is confirmed on device, no longer unproven; the fallbacks above are not needed. The exported MP4 parsed as avc1 + mp4a with a real audio track, an edit list (AAC priming) and moov before mdat.
 
 ## 2. MP4 muxer
 
