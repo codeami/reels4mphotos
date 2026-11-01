@@ -46,6 +46,8 @@ AI planner (Claude), captions/text overlays, trending audio (or any song list: t
 2. iOS native app (SwiftUI, PhotoKit, Vision, AVFoundation) sharing the same `ReelPlan` format.
 3. Bundle with the privacy-first messenger: send a reel end-to-end encrypted.
 
+Planning docs (roadmap, pending work, tech debt, how it was planned): [docs/planning/](docs/planning/).
+
 ## License
 
 MIT - see [LICENSE](LICENSE).
