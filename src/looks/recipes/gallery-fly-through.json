@@ -1,0 +1,30 @@
+{
+  "schema": "reel-recipe/1",
+  "id": "gallery-fly-through",
+  "name": "Gallery",
+  "blurb": "Your photos hang in a gallery; the camera walks you from one to the next on the beat.",
+  "fit": "cover",
+  "backdrop": "black",
+  "crossfadeFrames": 0,
+  "crossfadeEasing": "linear",
+  "planning": {
+    "cutBeats": null,
+    "maxPasses": 1,
+    "crossfade": "none",
+    "kenBurnsZoom": 1
+  },
+  "punch": null,
+  "flash": null,
+  "shake": 0,
+  "grain": 0,
+  "vignette": 0.25,
+  "letterbox": 0,
+  "grade": [],
+  "gallery": {
+    "fov": 55,
+    "fill": 0.72,
+    "photoArea": 1.5,
+    "travelShare": 0.45,
+    "travelMaxMs": 1400
+  }
+}

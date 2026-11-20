@@ -25,12 +25,15 @@ export class Player {
     private bitmaps: Map<string, ImageBitmap>,
     private audio: HTMLAudioElement | null,
     private onTime: (ms: number, playing: boolean) => void,
+    // What the look keeps between frames; a look that needs set-up before the first frame (the
+    // gallery's 3D stage) hands it in ready. Disposed with the player.
+    assets: LookAssets = new LookAssets(),
   ) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D is not available in this browser.');
     this.ctx = ctx;
     this.timeline = buildTimeline(plan);
-    this.surface = { width: canvas.width, height: canvas.height, assets: new LookAssets() };
+    this.surface = { width: canvas.width, height: canvas.height, assets };
     this.seek(0);
     this.drawPoster();
   }
@@ -79,6 +82,7 @@ export class Player {
     this.playing = false;
     cancelAnimationFrame(this.raf);
     this.audio?.pause();
+    this.surface.assets.dispose();
   }
 
   private loop = () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { LEGACY_LOOKS } from './legacy-looks.fixture';
+import { LEGACY_LOOKS, type LegacyLookId } from './legacy-looks.fixture';
 import { parseRecipes } from './load';
-import { LOOKS, LOOK_ORDER } from './looks';
+import { FLAGGED_LOOKS, LOOKS, LOOK_ORDER, chipOrder } from './looks';
 import type { Look } from './types';
 import { validateRecipe } from './validate';
 
@@ -29,8 +29,23 @@ describe('recipe files', () => {
     );
   });
 
-  it.each(LOOK_ORDER)('%s says exactly what the TypeScript look said before', (id) => {
-    expect(LOOKS[id]).toEqual(LEGACY_LOOKS[id]);
+  // The looks that existed before recipes; a look born as a recipe (the gallery) has no legacy copy.
+  it.each(Object.keys(LEGACY_LOOKS) as LegacyLookId[])(
+    '%s says exactly what the TypeScript look said before',
+    (id) => {
+      expect(LOOKS[id]).toEqual(LEGACY_LOOKS[id]);
+    },
+  );
+
+  it('the gallery look is the one look drawn in 3D, and the only one behind a flag', () => {
+    const gallery = LOOKS['gallery-fly-through'];
+    expect(gallery.gallery).toBeDefined();
+    expect(Object.values(LOOKS).filter((look) => look.gallery)).toEqual([gallery]);
+    expect(FLAGGED_LOOKS).toEqual({ 'gallery-fly-through': 'gallery' });
+    expect(chipOrder({ gallery: false })).toEqual(
+      LOOK_ORDER.filter((id) => id !== 'gallery-fly-through'),
+    );
+    expect(chipOrder({ gallery: true })).toEqual(LOOK_ORDER);
   });
 
   it('every file passes the schema', () => {

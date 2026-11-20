@@ -1,6 +1,7 @@
 import { h } from '../dom';
 import { cutsOnBeat, formatSeconds, planLine, shotIndexAt } from '../logic';
 import { Player } from '../player';
+import type { LookAssets } from '../../render/frames/assets';
 import type { BeatMap, ReelPlan } from '../seams/types';
 
 export interface PreviewHandle {
@@ -8,8 +9,10 @@ export interface PreviewHandle {
   destroy: () => void;
 }
 
-const PREVIEW_W = 540;
-const PREVIEW_H = 960;
+// The preview canvas: half the export's size, same 9:16 shape.
+export const PREVIEW_SIZE = { width: 540, height: 960 } as const;
+const PREVIEW_W = PREVIEW_SIZE.width;
+const PREVIEW_H = PREVIEW_SIZE.height;
 
 export function previewScreen(
   plan: ReelPlan,
@@ -17,6 +20,8 @@ export function previewScreen(
   audioUrl: string,
   beatmap: BeatMap,
   extras: Array<Node | false> = [],
+  // Look assets set up ahead of the first frame (the gallery's 3D stage); the player owns them.
+  assets?: LookAssets,
 ): PreviewHandle {
   const canvas = h('canvas', {
     class: 'reel-canvas',
@@ -44,20 +49,27 @@ export function previewScreen(
   const audio = new Audio(audioUrl);
   audio.preload = 'auto';
   let lastBeat = -1;
-  const player = new Player(canvas, plan, bitmaps, audio, (ms, playing) => {
-    playhead.style.left = `${(ms / plan.totalMs) * 100}%`;
-    clock.textContent = `${formatSeconds(ms)} / ${formatSeconds(plan.totalMs)}`;
-    counter.textContent = `SHOT ${String(shotIndexAt(plan, ms) + 1).padStart(2, '0')}/${String(plan.shots.length).padStart(2, '0')}`;
-    const beat = beatmap.beatsMs.filter((b) => b <= ms).length;
-    if (playing && beat !== lastBeat) {
-      beatFlash.classList.remove('on');
-      void beatFlash.offsetWidth;
-      beatFlash.classList.add('on');
-    }
-    lastBeat = beat;
-    playBtn.classList.toggle('is-playing', playing);
-    playBtn.setAttribute('aria-label', playing ? 'Pause preview' : 'Play preview');
-  });
+  const player = new Player(
+    canvas,
+    plan,
+    bitmaps,
+    audio,
+    (ms, playing) => {
+      playhead.style.left = `${(ms / plan.totalMs) * 100}%`;
+      clock.textContent = `${formatSeconds(ms)} / ${formatSeconds(plan.totalMs)}`;
+      counter.textContent = `SHOT ${String(shotIndexAt(plan, ms) + 1).padStart(2, '0')}/${String(plan.shots.length).padStart(2, '0')}`;
+      const beat = beatmap.beatsMs.filter((b) => b <= ms).length;
+      if (playing && beat !== lastBeat) {
+        beatFlash.classList.remove('on');
+        void beatFlash.offsetWidth;
+        beatFlash.classList.add('on');
+      }
+      lastBeat = beat;
+      playBtn.classList.toggle('is-playing', playing);
+      playBtn.setAttribute('aria-label', playing ? 'Pause preview' : 'Play preview');
+    },
+    assets,
+  );
   playBtn.addEventListener('click', () => (player.isPlaying ? player.pause() : void player.play()));
 
   const ticks = beatmap.beatsMs

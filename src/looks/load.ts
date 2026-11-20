@@ -6,7 +6,7 @@ export const RECIPE_SCHEMA = 'reel-recipe/1';
 const nameOf = (path: string) => path.replace(/^.*\//, '').replace(/\.json$/, '');
 
 // The effect modules are alternatives: a look is drawn by at most one of them.
-const EFFECTS = ['edgePulse', 'zoomThrough', 'glitch'] as const;
+const EFFECTS = ['edgePulse', 'zoomThrough', 'glitch', 'gallery'] as const;
 
 /**
  * Recipe files (path to parsed JSON) become looks, keyed by id. A bad recipe stops the app at

@@ -9,6 +9,6 @@ export default defineConfig({
   // The app's own public/ folder, so the harness renders to the real bundled tracks and beat maps.
   publicDir: fileURLToPath(new URL('../../../public', import.meta.url)),
   // Pre-bundle up front: finding mediabunny mid-test makes Vite reload the page under the test.
-  optimizeDeps: { include: ['mediabunny'] },
+  optimizeDeps: { include: ['mediabunny', 'three'] },
   server: { fs: { allow: [repoRoot] } },
 });

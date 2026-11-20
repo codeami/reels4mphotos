@@ -3,16 +3,26 @@ import { BackdropCache, LruCache, type ScratchFactory } from './backdrop';
 import type { EdgeSet } from './edges';
 import { makeGrainTile, paintVignette } from './overlays';
 import type { RenderContext } from './canvas';
+import type { GalleryStage } from './gallery';
 
-// What a look keeps between frames: the blurred fills (one per photo) and the noise tile. One of
-// these lives as long as one renderer (an export, or a preview player).
+// What a look keeps between frames: the blurred fills (one per photo), the noise tile, and for the
+// gallery look its 3D stage. One of these lives as long as one renderer (an export, or a preview
+// player), and is disposed with it.
 export class LookAssets {
   readonly backdrops = new BackdropCache();
   // One edge map per photo (neon edge pulse): found once, then only drawn.
   readonly edges = new LruCache<EdgeSet>(4);
+  // The gallery look's room, with every photo hung; prepareGallery() (./gallery) sets it up.
+  gallery: GalleryStage | null = null;
   private grain: RenderCanvas | null = null;
 
   constructor(readonly makeScratch: ScratchFactory = createScratchCanvas) {}
+
+  // Frees what holds GPU memory: the gallery's WebGL context. Canvases are left to the collector.
+  dispose(): void {
+    this.gallery?.dispose();
+    this.gallery = null;
+  }
 
   private readonly vignettes = new Map<string, RenderCanvas>();
 

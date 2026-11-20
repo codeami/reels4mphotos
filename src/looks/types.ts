@@ -96,6 +96,21 @@ export interface Glitch {
   chroma: number;
 }
 
+// Gallery fly-through: the photos hang on the walls of one fixed room, drawn in 3D (three.js, bundled),
+// and a camera flies from photo to photo, arriving on each cut. src/render/frames/gallery.
+export interface Gallery {
+  // Vertical field of view of the camera, in degrees.
+  fov: number;
+  // How much of the frame's height (or width, for a wide photo) a photo fills when the camera stops.
+  fill: number;
+  // Area of each hung photo in square metres; all photos get the same area at their own aspect.
+  photoArea: number;
+  // The share of a shot spent flying to the next photo; the rest is the stop on this one.
+  travelShare: number;
+  // The flight never takes longer than this, so a long shot is mostly a stop.
+  travelMaxMs: number;
+}
+
 // The shape of a reel, for a recipe that describes a format and not only an effect. Used by the
 // planner (src/curation/plan.ts); a look without one is cut as it always was. Counts are beats of
 // the chosen track.
@@ -135,9 +150,10 @@ export interface Look {
   vignette: number; // alpha at the corners, 0 = none
   letterbox: number; // bar height as a fraction of frame height, 0 = none
   grade: readonly GradeFill[];
-  // At most one of these three is set; each look that sets one is drawn by its own small module.
+  // At most one of these four is set; each look that sets one is drawn by its own module.
   edgePulse?: EdgePulse;
   zoomThrough?: ZoomThrough;
   glitch?: Glitch;
+  gallery?: Gallery;
   structure?: Structure;
 }

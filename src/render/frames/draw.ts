@@ -75,10 +75,20 @@ export function drawFrame(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = smoothing;
 
-  const top = at(descriptor.layers, descriptor.layers.length - 1).shotIndex;
-  for (const layer of descriptor.layers) {
-    const isTop = layer.shotIndex === top;
-    drawLayer(ctx, plan, look, layer, isTop ? descriptor : null, photoFor, surface);
+  if (look.gallery) {
+    // The room is drawn in 3D on its own canvas (prepared ahead by prepareGallery, since loading
+    // three and uploading the photos is async) and copied into the frame as the bottom layer.
+    const stage = surface.assets.gallery;
+    if (!stage) throw new Error('the gallery look needs a prepared stage: call prepareGallery()');
+    const layer = at(descriptor.layers, descriptor.layers.length - 1);
+    stage.render(layer.shotIndex, layer.progress);
+    ctx.drawImage(stage.canvas, 0, 0, width, height);
+  } else {
+    const top = at(descriptor.layers, descriptor.layers.length - 1).shotIndex;
+    for (const layer of descriptor.layers) {
+      const isTop = layer.shotIndex === top;
+      drawLayer(ctx, plan, look, layer, isTop ? descriptor : null, photoFor, surface);
+    }
   }
   ctx.globalAlpha = 1;
 

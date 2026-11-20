@@ -1,9 +1,11 @@
 import { FPS, FRAME_HEIGHT, FRAME_WIDTH } from '../constants';
+import { lookOf } from '../../looks';
 import type { ReelPlan } from '../../types/reel-plan';
 import { LookAssets } from './assets';
 import { getRenderContext, type RenderCanvas, type RenderContext } from './canvas';
 import { drawFrame, type DrawSurface } from './draw';
 import type { DecodedPhoto } from './draw';
+import { prepareGallery } from './gallery';
 import type { PhotoProvider } from './photo-store';
 import { buildTimeline, type Timeline } from './timeline';
 import { at } from '../util';
@@ -37,11 +39,20 @@ export class FrameGenerator {
   async drawFrame(index: number): Promise<void> {
     const descriptor = this.timeline.describeFrame(index);
     const loaded = new Map<number, DecodedPhoto>();
-    for (const layer of descriptor.layers) {
-      loaded.set(
-        layer.shotIndex,
-        await this.photos.get(at(this.plan.shots, layer.shotIndex).photoId),
+    const gallery = lookOf(this.plan).gallery;
+    if (gallery) {
+      // Every photo hangs in the room from the first frame, so the stage takes them all up front
+      // and the frame itself needs none of them decoded.
+      await prepareGallery(this.surface.assets, this.plan, gallery, this.surface, (photoId) =>
+        this.photos.get(photoId),
       );
+    } else {
+      for (const layer of descriptor.layers) {
+        loaded.set(
+          layer.shotIndex,
+          await this.photos.get(at(this.plan.shots, layer.shotIndex).photoId),
+        );
+      }
     }
     drawFrame(
       this.ctx,
@@ -65,5 +76,6 @@ export class FrameGenerator {
 
   dispose(): void {
     this.photos.dispose();
+    this.surface.assets.dispose();
   }
 }

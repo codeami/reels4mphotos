@@ -6,20 +6,42 @@ import photoDump from './recipes/photo-dump.json' with { type: 'json' };
 import neonEdgePulse from './recipes/neon-edge-pulse.json' with { type: 'json' };
 import zoomThrough from './recipes/zoom-through.json' with { type: 'json' };
 import glitchSlice from './recipes/glitch-slice.json' with { type: 'json' };
+import galleryFlyThrough from './recipes/gallery-fly-through.json' with { type: 'json' };
 import { parseRecipes } from './load';
 import type { Look, LookId } from './types';
 
-// The order of the chips on the preview screen.
+// Every look the engine can cut and draw, in chip order. A look behind a feature flag is listed
+// here too (the renderer and the tests know it); chipOrder() leaves it out of the chips while the
+// flag is off.
 export const LOOK_ORDER: readonly LookId[] = [
   'classic',
   'zoom-punch',
   'flash-cut',
   'cinematic',
   'photo-dump',
+  'gallery-fly-through',
   'neon-edge-pulse',
   'zoom-through',
   'glitch-slice',
 ];
+
+// Feature flags a look can sit behind. The gallery look is off by default: it needs WebGL and the
+// bundled three.js, and the captain has not seen it on a phone yet.
+export interface LookFlags {
+  gallery: boolean;
+}
+
+export const FLAGGED_LOOKS: Readonly<Partial<Record<LookId, keyof LookFlags>>> = {
+  'gallery-fly-through': 'gallery',
+};
+
+// The chips to show: every look whose flag (if any) is on, in LOOK_ORDER.
+export function chipOrder(flags: LookFlags): LookId[] {
+  return LOOK_ORDER.filter((id) => {
+    const flag = FLAGGED_LOOKS[id];
+    return flag === undefined || flags[flag];
+  });
+}
 
 // Each look is a recipe file in ./recipes (checked against recipe.schema.json when the app starts),
 // so a look is data a person can read and edit. Numbers come from the scout's recipes
@@ -36,6 +58,7 @@ const recipes = parseRecipes({
   './recipes/neon-edge-pulse.json': neonEdgePulse,
   './recipes/zoom-through.json': zoomThrough,
   './recipes/glitch-slice.json': glitchSlice,
+  './recipes/gallery-fly-through.json': galleryFlyThrough,
 });
 
 function recipeFor(id: LookId): Look {
