@@ -148,6 +148,19 @@
         "chroma": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
+    "gallery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fov", "fill", "photoArea", "travelShare", "travelMaxMs"],
+      "description": "The photos hang in one fixed 3D room and a camera flies from one to the next, stopping on each cut. Drawn with the bundled three.js; see src/render/frames/gallery.",
+      "properties": {
+        "fov": { "type": "number", "minimum": 30, "maximum": 90 },
+        "fill": { "type": "number", "minimum": 0.3, "maximum": 1 },
+        "photoArea": { "type": "number", "minimum": 0.2, "maximum": 4 },
+        "travelShare": { "type": "number", "minimum": 0.1, "maximum": 0.8 },
+        "travelMaxMs": { "type": "number", "minimum": 200, "maximum": 5000 }
+      }
+    },
     "structure": {
       "type": "object",
       "additionalProperties": false,

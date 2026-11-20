@@ -1,7 +1,7 @@
 import { createRenderCanvas } from '../frames/canvas';
 import { FrameGenerator } from '../frames/generator';
 import { PhotoStore } from '../frames/photo-store';
-import { AudioSampleSink, BlobSource, Input, MP4, VideoSampleSink } from 'mediabunny';
+import { AudioSampleSink, BlobSource, BufferSource, Input, MP4, VideoSampleSink } from 'mediabunny';
 import { decodeTrack } from '../audio/decode';
 import { estimateLagMs } from '../audio/lag';
 import type { BeatMap } from '../beat-map';
@@ -64,6 +64,8 @@ export interface EncodedFrameCheck {
   decoded: number[];
   expected: number[];
   maxDiff: number;
+  // Brightest minus darkest pixel of the decoded thumbnail: 0 for a flat (black) frame.
+  spread: number;
 }
 
 export interface AudioLagResult {
@@ -182,6 +184,19 @@ function meanRgb(ctx: OffscreenCanvasRenderingContext2D): number[] {
     sums[2] = (sums[2] ?? 0) + (data[i + 2] ?? 0);
   }
   return sums.map((sum) => sum / (THUMB_W * THUMB_H));
+}
+
+// Brightest minus darkest pixel (mean of r, g, b) in the thumbnail.
+function lumaSpread(ctx: OffscreenCanvasRenderingContext2D): number {
+  const { data } = ctx.getImageData(0, 0, THUMB_W, THUMB_H);
+  let min = 255;
+  let max = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const luma = ((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0)) / 3;
+    min = Math.min(min, luma);
+    max = Math.max(max, luma);
+  }
+  return max - min;
 }
 
 async function sha256(bytes: Uint8ClampedArray): Promise<string> {
@@ -370,9 +385,14 @@ export const harness = {
   // Renders a short reel, decodes frames back out of the MP4 and compares each with the frame the
   // generator draws for the same index (mean colour of a 54x96 thumbnail: robust to compression,
   // yet a shifted timestamp or a swapped frame changes it). Proves the file holds the planned
-  // frames in the planned order, which the file's metadata alone cannot.
-  async encodedFrames(indices: number[]): Promise<EncodedFrameCheck[]> {
-    const { plan, beatmap } = await buildHarnessReel(GATE_TRACK_ID, 5);
+  // frames in the planned order, which the file's metadata alone cannot. The classic reel is cut
+  // to five shots; another look keeps its whole plan (the gallery hangs every photo from frame 0).
+  async encodedFrames(indices: number[], look: LookId = 'classic'): Promise<EncodedFrameCheck[]> {
+    const { plan, beatmap } = await buildHarnessReel(
+      GATE_TRACK_ID,
+      look === 'classic' ? 5 : undefined,
+      look,
+    );
     const photos = await makePhotos(plan);
     const { blob } = await renderReelWithReport(plan, photos, beatmap, () => {}, {
       forcePath: 'silent',
@@ -411,11 +431,40 @@ export const harness = {
         const decoded = meanRgb(decodedCtx);
         const expected = meanRgb(expectedCtx);
         const maxDiff = Math.max(...decoded.map((v, c) => Math.abs(v - (expected[c] ?? 0))));
-        checks.push({ index, decoded, expected, maxDiff });
+        checks.push({ index, decoded, expected, maxDiff, spread: lumaSpread(decodedCtx) });
       }
       return checks;
     } finally {
       generator.dispose();
+      input.dispose();
+    }
+  },
+
+  // Stills from an exported file, for evidence a person can look at: the frame at each time, decoded
+  // from the MP4 and scaled to `width` wide, as PNG data URLs.
+  async stills(base64: string, timesSec: number[], width = 270): Promise<string[]> {
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const input = new Input({ source: new BufferSource(bytes), formats: [MP4] });
+    try {
+      const track = await input.getPrimaryVideoTrack();
+      if (!track) throw new Error('the export has no video track');
+      const height = Math.round(
+        (width * (await track.getDisplayHeight())) / (await track.getDisplayWidth()),
+      );
+      const sink = new VideoSampleSink(track);
+      const canvas = new OffscreenCanvas(width, height);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('2d context unavailable');
+      const out: string[] = [];
+      for (const t of timesSec) {
+        const sample = await sink.getSample(t);
+        if (!sample) throw new Error(`no frame at ${t} s`);
+        sample.draw(ctx, 0, 0, width, height);
+        sample.close();
+        out.push(await toBase64(await canvas.convertToBlob({ type: 'image/png' })));
+      }
+      return out;
+    } finally {
       input.dispose();
     }
   },

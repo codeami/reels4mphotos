@@ -15,7 +15,8 @@ export type LookId =
   | 'photo-dump'
   | 'neon-edge-pulse'
   | 'zoom-through'
-  | 'glitch-slice';
+  | 'glitch-slice'
+  | 'gallery-fly-through';
 
 export interface ReelShot {
   /** Stable id the UI and render engine both use. */

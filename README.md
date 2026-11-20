@@ -28,7 +28,7 @@ Someone with a camera roll full of trip / event photos who wants a reel to post 
 
 Everything runs in the browser. No account, no server, no network after the page loads.
 
-Looks (the eight chips above) and the silent export are in scope. The single-photo looks are plain canvas drawing: the neon outline is found from the photo's own edges with image maths (Sobel), not a model, and no person cut-out is done.
+Looks (the eight chips above) and the silent export are in scope. A ninth look, Gallery (the photos hang in a 3D room and the camera flies from one to the next on the beat, drawn with the bundled three.js), sits behind the `?gallery=1` flag until it has been seen on a phone; see `docs/looks.md`. The single-photo looks are plain canvas drawing: the neon outline is found from the photo's own edges with image maths (Sobel), not a model, and no person cut-out is done.
 
 ## Out of scope for MVP
 

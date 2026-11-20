@@ -16,10 +16,15 @@ function tagFor(id: LookId, photos: number): string | null {
 /**
  * One chip per look, under the reel: tap one and the preview above is cut and drawn that way.
  * `photos` is how many different photos the reel is cut from; a look that needs more is greyed out
- * and says how many.
+ * and says how many. `order` is the looks to show (chipOrder() leaves out a look whose flag is off).
  */
-export function looksRow(selected: LookId, a: LookActions, photos: number): HTMLElement {
-  const fewest = Math.min(...LOOK_ORDER.map((id) => minPhotosOf(LOOKS[id])));
+export function looksRow(
+  selected: LookId,
+  a: LookActions,
+  photos: number,
+  order: readonly LookId[] = LOOK_ORDER,
+): HTMLElement {
+  const fewest = Math.min(...order.map((id) => minPhotosOf(LOOKS[id])));
   return h(
     'section',
     { class: 'looks', 'aria-labelledby': 'h-looks', 'data-testid': 'looks' },
@@ -27,7 +32,7 @@ export function looksRow(selected: LookId, a: LookActions, photos: number): HTML
     h(
       'div',
       { class: 'look-row', role: 'group', 'aria-labelledby': 'h-looks' },
-      ...LOOK_ORDER.map((id) => {
+      ...order.map((id) => {
         const tag = tagFor(id, photos);
         return h(
           'button',

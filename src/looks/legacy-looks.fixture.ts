@@ -3,7 +3,10 @@ import type { Look, LookId } from './types';
 
 // The looks as they were written in TypeScript before they moved to JSON recipes (src/looks/recipes).
 // Frozen here so a test can prove every recipe still says the same thing. Do not edit to match a recipe.
-export const LEGACY_LOOKS: Readonly<Record<LookId, Look>> = {
+// A look born as a recipe (the gallery) has no entry here.
+export type LegacyLookId = Exclude<LookId, 'gallery-fly-through'>;
+
+export const LEGACY_LOOKS: Readonly<Record<LegacyLookId, Look>> = {
   // Today's reel: Ken Burns on a black frame, a short fade on every third cut.
   classic: {
     id: 'classic',

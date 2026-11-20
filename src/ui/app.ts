@@ -2,6 +2,7 @@ import { adviceFor, analyseSet } from '../curation/advice';
 import { rerollReel } from '../curation/reroll';
 import { h } from './dom';
 import { intake } from './intake';
+import { readFlags } from './flags';
 import { checkCount, FEWEST_PHOTOS, move, toggle } from './logic';
 import { decideRating, initialRating, NOTES, rerollPool } from './rating';
 import { enableDragReorder } from './reorder';
@@ -11,13 +12,15 @@ import { customizeBlock } from './screens/customize';
 import { exportScreen } from './screens/export';
 import { looksRow } from './screens/looks';
 import { pickScreen } from './screens/pick';
-import { previewScreen, type PreviewHandle } from './screens/preview';
+import { PREVIEW_SIZE, previewScreen, type PreviewHandle } from './screens/preview';
 import { reviewScreen } from './screens/review';
 import { ratingBlock } from './screens/rating';
 import { stopSample, trackScreen } from './screens/track';
 import type { Engines, LookId } from './seams/types';
 import { createThumbs, keptFiles, stage, toggleKept } from './staging';
-import { LOOKS, lookForPhotoCount, minPhotosOf } from '../looks';
+import { LOOKS, chipOrder, lookForPhotoCount, minPhotosOf } from '../looks';
+import { LookAssets } from '../render/frames/assets';
+import { loadGallery, prepareGallery } from '../render/frames/gallery';
 import { createStore, stageOf, STEPS, type Photo, type State } from './store';
 
 const TITLES: Record<(typeof STEPS)[number], string> = {
@@ -36,11 +39,18 @@ export function createApp(root: HTMLElement, engines: Engines) {
   let pendingFocus: string | null = null;
   let ratingEl: HTMLElement | null = null;
   let looksEl: HTMLElement | null = null;
+  // Look assets made ready for the next preview screen (the gallery's 3D stage); the player owns
+  // them once it is built.
+  let previewAssets: LookAssets | null = null;
   const thumbs = createThumbs();
+  // Feature flags come from the page URL, once. Off by default: `?gallery=1` shows the Gallery look.
+  const flags = readFlags(location.search);
+  const chips = chipOrder(flags);
 
   // Background only: a failure is not the user's problem, the export path copes on its own.
-  // `data-warm` marks the moment load-time requests are over, for the zero-request E2E.
-  void (engines.warmUp?.() ?? Promise.resolve())
+  // `data-warm` marks the moment load-time requests are over, for the zero-request E2E. With the
+  // gallery flag on, its three.js code is loaded now too, so tapping the chip later fetches nothing.
+  void Promise.all([engines.warmUp?.(), flags.gallery ? loadGallery() : undefined])
     .catch(() => undefined)
     .then(() => root.setAttribute('data-warm', 'done'));
 
@@ -259,9 +269,28 @@ export function createApp(root: HTMLElement, engines: Engines) {
             (await createImageBitmap(file, { resizeWidth: BITMAP_WIDTH })),
         );
       }
+      // The gallery look draws in 3D: its stage (three.js, the room, every photo as a texture) is
+      // set up here, at preview size, before the player draws its first frame.
+      const gallery = LOOKS[s.look].gallery;
+      let assets: LookAssets | null = null;
+      if (gallery) {
+        assets = new LookAssets();
+        try {
+          await prepareGallery(assets, plan, gallery, PREVIEW_SIZE, async (photoId) => {
+            const bitmap = next.get(photoId);
+            if (!bitmap) throw new Error(`no preview photo for "${photoId}"`);
+            return { image: bitmap, width: bitmap.width, height: bitmap.height };
+          });
+        } catch (error) {
+          assets.dispose();
+          throw error;
+        }
+      }
       preview?.destroy();
       preview = null;
       previewFor = null;
+      previewAssets?.dispose();
+      previewAssets = assets;
       bitmaps.forEach((b, id) => next.get(id) === b || b.close());
       bitmaps = next;
       store.set({ busy: null, plan, step: 'preview', exp: { kind: 'idle' } });
@@ -383,6 +412,13 @@ export function createApp(root: HTMLElement, engines: Engines) {
     stopSample();
     if (step === 'add' && store.get().staged.length > 0) releaseStaged();
     if (step !== 'preview') closePreview();
+    // Back to the preview after it was closed (from the export screen): its decoded photos and any
+    // 3D stage went with it, so the reel is cut again from the same choices.
+    if (step === 'preview' && !preview && store.get().track) {
+      store.set({ notice: null, confirmClear: false });
+      void goPreview();
+      return;
+    }
     store.set({ step, notice: null, confirmClear: false });
     const { trackId, track } = store.get();
     if (step === 'track' && trackId && !track) void chooseTrack(trackId);
@@ -475,14 +511,22 @@ export function createApp(root: HTMLElement, engines: Engines) {
       case 'preview': {
         if (!s.plan || !s.track) return h('section', { class: 'screen' });
         ratingEl = ratingBlock(s.rating, { onRate: rate });
-        looksEl = looksRow(s.look, { onLook: setLook }, s.order.length);
-        preview = previewScreen(s.plan, bitmaps, s.track.audioUrl, s.track.beatmap, [
-          looksEl,
-          ratingEl,
-          adviceCard(adviceFor(analyseSet(s.photos.map((p) => p.score)))),
-          customizeBlock(s, { onCustomize: goto, onLength: setLength }),
-          s.skipped.length > 0 && skippedChips(s.skipped),
-        ]);
+        looksEl = looksRow(s.look, { onLook: setLook }, s.order.length, chips);
+        preview = previewScreen(
+          s.plan,
+          bitmaps,
+          s.track.audioUrl,
+          s.track.beatmap,
+          [
+            looksEl,
+            ratingEl,
+            adviceCard(adviceFor(analyseSet(s.photos.map((p) => p.score)))),
+            customizeBlock(s, { onCustomize: goto, onLength: setLength }),
+            s.skipped.length > 0 && skippedChips(s.skipped),
+          ],
+          previewAssets ?? undefined,
+        );
+        previewAssets = null;
         previewFor = s.plan;
         return preview.el;
       }
@@ -535,7 +579,7 @@ export function createApp(root: HTMLElement, engines: Engines) {
     }
     if (keepPreview && looksEl) {
       // The chip you tapped lights up at once, while the new cut is still being built.
-      const next = looksRow(s.look, { onLook: setLook }, s.order.length);
+      const next = looksRow(s.look, { onLook: setLook }, s.order.length, chips);
       looksEl.replaceWith(next);
       looksEl = next;
     }

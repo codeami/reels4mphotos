@@ -6,6 +6,7 @@ import { RenderError } from '../errors';
 import { LookAssets } from './assets';
 import type { RenderCanvas, RenderContext } from './canvas';
 import { drawFrame, type DecodedPhoto, type DrawSurface } from './draw';
+import type { GalleryStage } from './gallery';
 import { buildTimeline } from './timeline';
 
 // A context that only remembers what it was asked to do, in order.
@@ -97,6 +98,25 @@ function frame(plan: ReelPlan, index: number, surface?: DrawSurface) {
   return { calls, ops, drawn: calls.filter((c) => c.op === 'drawImage') };
 }
 
+// A stand-in for the gallery's 3D stage: remembers what it was asked to render.
+function stubStage() {
+  const rendered: [number, number][] = [];
+  let disposed = 0;
+  const canvas = { stage: true } as unknown as CanvasImageSource;
+  const stage: GalleryStage = {
+    canvas,
+    addPhoto: () => Promise.resolve(),
+    build: () => undefined,
+    render: (shotIndex, progress) => {
+      rendered.push([shotIndex, progress]);
+    },
+    dispose: () => {
+      disposed++;
+    },
+  };
+  return { stage, canvas, rendered, disposed: () => disposed };
+}
+
 describe('drawFrame', () => {
   it('draws a classic frame as it always did: one photo straight into the whole frame, nothing on top', () => {
     const { drawn, ops } = frame(planFor('classic', 'nine-sixteen'), 10);
@@ -111,6 +131,7 @@ describe('drawFrame', () => {
     for (const id of Object.keys(LOOKS) as LookId[]) {
       const crops = LOOKS[id].fit === 'cover' ? 'nine-sixteen' : 'whole';
       const { assets } = scratchWithRecorder();
+      if (LOOKS[id].gallery) assets.gallery = stubStage().stage;
       const { calls } = frame(planFor(id, crops), 4, {
         width: FRAME_WIDTH,
         height: FRAME_HEIGHT,
@@ -296,5 +317,38 @@ describe('drawFrame in the single-photo looks', () => {
       const b = frame(planFor(look, crops), 31, surfaceWith(scratchWithRecorder().assets));
       expect(JSON.stringify(a.calls)).toBe(JSON.stringify(b.calls));
     }
+  });
+
+  describe('gallery fly-through', () => {
+    const plan = planFor('gallery-fly-through', 'nine-sixteen');
+
+    it('refuses to draw before its stage is prepared, naming the call that prepares it', () => {
+      const { assets } = scratchWithRecorder();
+      expect(() => frame(plan, 40, surfaceWith(assets))).toThrow(/prepareGallery/);
+    });
+
+    it('renders the stage for the top layer and copies it into the whole frame, then the vignette', () => {
+      const { assets } = scratchWithRecorder();
+      const stub = stubStage();
+      assets.gallery = stub.stage;
+      // frame 40 is 10 frames into the second shot (frames 30..59), so progress 10/29
+      const { drawn, ops } = frame(plan, 40, surfaceWith(assets));
+      expect(stub.rendered).toEqual([[1, 10 / 29]]);
+      expect(drawn).toHaveLength(2);
+      expect(drawn[0]?.args).toEqual([stub.canvas, 0, 0, FRAME_WIDTH, FRAME_HEIGHT]);
+      // the photo itself is never drawn by the 2d context: it hangs inside the stage
+      expect(drawn.some((c) => c.args[0] === LANDSCAPE.image)).toBe(false);
+      expect(ops().indexOf('drawImage')).toBeGreaterThan(ops().indexOf('fillRect'));
+    });
+
+    it('is disposed with its assets, once', () => {
+      const { assets } = scratchWithRecorder();
+      const stub = stubStage();
+      assets.gallery = stub.stage;
+      assets.dispose();
+      assets.dispose();
+      expect(stub.disposed()).toBe(1);
+      expect(assets.gallery).toBeNull();
+    });
   });
 });
